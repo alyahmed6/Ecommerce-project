@@ -8,7 +8,6 @@ function Cart() {
   const cartOpen = useSelector((state) => state.ui.cartOpen);
   const cartItems = useSelector((state) => state.cart.items);
 
-  // Total price calculation
   const total = cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
@@ -17,8 +16,7 @@ function Cart() {
   return (
     <>
       <Toaster position="top-right" reverseOrder={false} />
-
-      {/* Background overlay */}
+ 
       {cartOpen && (
         <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
@@ -26,14 +24,12 @@ function Cart() {
         ></div>
       )}
 
-      {/* Cart Drawer */}
       <div
         className={`fixed top-0 right-0 h-full w-[350px] bg-white shadow-2xl z-50 p-5 
           transition-transform duration-300
           ${cartOpen ? "translate-x-0" : "translate-x-full"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex justify-between items-center mb-5 border-b pb-2">
           <h2 className="text-2xl font-bold">Your Cart</h2>
           <button
@@ -44,7 +40,6 @@ function Cart() {
           </button>
         </div>
 
-        {/* Empty State */}
         {cartItems.length === 0 ? (
           <p className="text-center text-gray-600 mt-20">Your cart is empty 😢</p>
         ) : (
@@ -54,7 +49,7 @@ function Cart() {
                 key={item.id}
                 className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg  shadow-sm"
               >
-                {/* Image */}
+              
                 <img
                   src={item.image_url}
                   alt={item.name}
@@ -63,12 +58,10 @@ function Cart() {
 
                 <div className="flex flex-col flex-1">
                   <h3 className="font-semibold">{item.name}</h3>
-                  {/* Show price * quantity */}
                   <p className="text-blue-600 font-bold">
                     ${(item.price * item.quantity).toFixed(2)}
                   </p>
 
-                  {/* Quantity */}
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 transition"
@@ -88,7 +81,6 @@ function Cart() {
                   </div>
                 </div>
 
-                {/* Remove */}
                 <button
                   onClick={() => {
                     dispatch(removeFromCart(item.id));
@@ -110,7 +102,6 @@ function Cart() {
           </div>
         )}
 
-        {/* Footer */}
         <div className="absolute bottom-0 left-0 w-full p-5 border-t bg-white">
           <div className="flex justify-between font-bold text-lg mb-4">
             <span>Total</span>

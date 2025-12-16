@@ -87,7 +87,6 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
           ))}
         </select>
 
-        {/* Image upload box */}
         <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 transition-colors bg-gray-50">
           {imagePreview ? (
             <img src={imagePreview} alt="Preview" className="h-full w-full object-cover rounded-xl" />

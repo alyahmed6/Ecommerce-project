@@ -12,7 +12,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// Dummy data
 const weeklySales = [
   { name: "Mon", sales: 240 },
   { name: "Tue", sales: 300 },
@@ -44,7 +43,6 @@ const COLORS = ["#2563EB", "#34D399", "#FBBF24", "#F87171"];
 const AdminDashboardCharts = () => {
   return (
     <div className="flex flex-col h-full gap-6 p-4 md:p-8 ">
-      {/* Weekly Sales */}
       <div className="bg-white shadow-lg rounded-2xl p-6 flex-1 min-h-[300px]">
         <h2 className="text-xl font-semibold mb-4">Weekly Sales</h2>
         <ResponsiveContainer width="100%" height="80%">
@@ -57,7 +55,6 @@ const AdminDashboardCharts = () => {
         </ResponsiveContainer>
       </div>
 
-      {/* Monthly Revenue */}
       <div className="bg-white shadow-lg rounded-2xl p-6 flex-1 min-h-[300px]">
         <h2 className="text-xl font-semibold mb-4">Monthly Revenue</h2>
         <ResponsiveContainer width="100%" height="80%">
@@ -70,10 +67,9 @@ const AdminDashboardCharts = () => {
         </ResponsiveContainer>
       </div>
 
-      {/* Category Distribution */}
       <div className="bg-white shadow-lg rounded-2xl p-6 flex-1 min-h-[300px]">
         <h2 className="text-xl font-semibold mb-4">Category Distribution</h2>
-        <ResponsiveContainer width="100%" height="80%">
+        <ResponsiveContainer width="100%" height="90%">
           <PieChart>
             <Pie
               data={categoryDistribution}

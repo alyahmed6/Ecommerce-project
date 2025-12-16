@@ -46,7 +46,6 @@ const Navbar = ({ handleScroll }) => {
     <header className="bg-white fixed top-0 left-0 right-0 shadow-md z-10">
       <nav className="flex min-h-[14vh] max-w-[1500px] mx-auto items-center justify-between px-8">
 
-        {/* Logo */}
         <Link to="/">
           <h2 className="text-2xl font-extrabold text-zinc-900 tracking-wide">
             APP
@@ -57,7 +56,7 @@ const Navbar = ({ handleScroll }) => {
         <div className="pl-18 hidden md:flex gap-8 text-lg font-semibold">
           <Link to="/" className="hover:text-blue-600 transition">Home</Link>
           <Link to="/product" className="hover:text-blue-600 transition">Products</Link>
-          <Link to="/contact" className="hover:text-blue-600 transition">Contact Us</Link>
+          <Link to="/About-us" className="hover:text-blue-600 transition">About Us</Link>
         </div>
 
 

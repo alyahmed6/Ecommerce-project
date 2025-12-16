@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import BannerImage from '../../assets/Ban.jpg';
 
 const Banner = () => {
-  // Set the sale end date (YYYY, MM-1, DD, HH, MM, SS)
-  const saleEndDate = new Date(2025, 11, 31, 23, 59, 59); // December 31, 2025 23:59:59
+  const saleEndDate = new Date(2025, 11, 31, 23, 59, 59); 
 
   const [timeLeft, setTimeLeft] = useState({
     hours: '00',

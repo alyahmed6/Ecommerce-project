@@ -36,7 +36,6 @@ function Wishlist() {
                     className="absolute inset-0 w-full h-full object-cover"
                   />
 
-                  {/* Remove from Wishlist */}
                   <button
                     className="absolute top-2 right-2 bg-white/80 hover:bg-white shadow-md w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition"
                     onClick={() => {

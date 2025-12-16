@@ -28,7 +28,6 @@ function Product({ limit }) {
 
     const displayedProducts = limit ? filteredProducts.slice(0, limit) : filteredProducts;
 
-    // Load products
     async function loadProducts(category) {
         setLoading(true);
 
@@ -57,7 +56,7 @@ function Product({ limit }) {
 
     return (
         <section id="products-section">
-            <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+            <div className=" py-12 px-4 sm:px-6 lg:px-8">
 
 
                 <div className="flex gap-3 justify-center items-center pb-10">

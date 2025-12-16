@@ -8,7 +8,7 @@ const MainLayout = () => {
     <>
       <Navbar />
       <Cart />
-      <Outlet /> {/* Page content */}
+      <Outlet />
       <Footer />
     </>
   );
