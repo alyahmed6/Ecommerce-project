@@ -33,6 +33,8 @@ const ProductPage = () => {
   const [sortOrder, setSortOrder] = useState("");
   const [priceRange, setPriceRange] = useState([0, 5000]);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   const categories = ["All", "Mens", "Womens", "New Arrivals", "On Sale"];
 
@@ -67,19 +69,24 @@ const ProductPage = () => {
   
   const filteredProducts = products
     .filter(
-      (p) => p.price >= priceRange[0] && p.price <= priceRange[1]
+      (p) => Number(p.price || 0) >= priceRange[0] && Number(p.price || 0) <= priceRange[1]
     )
     .sort((a, b) => {
-      if (sortOrder === "asc") return a.price - b.price;
-      if (sortOrder === "desc") return b.price - a.price;
+      if (sortOrder === "asc") return Number(a.price || 0) - Number(b.price || 0);
+      if (sortOrder === "desc") return Number(b.price || 0) - Number(a.price || 0);
       return 0;
     });
 
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
+  const visibleProducts = filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => setCurrentPage(1), [activeCategory, sortOrder, priceRange[0], priceRange[1]]);
+
   return (
-    <section className="mt-[200px] px-6 flex gap-10">
+    <section className="mt-[200px] mb-10 px-6 flex gap-10">
 
     
-      <aside className="w-64 bg-white shadow-md rounded-xl p-5 h-fit sticky top-24">
+      <aside className="w-64 mt-20 bg-white shadow-md rounded-xl p-5 h-fit sticky top-24">
         <h2 className="text-xl font-bold mb-4">Filters</h2>
 
         <p className="font-semibold mb-2">Category</p>
@@ -152,8 +159,9 @@ const ProductPage = () => {
         ) : filteredProducts.length === 0 ? (
           <p className="text-center text-gray-500">No products found</p>
         ) : (
+          <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => {
+            {visibleProducts.map((product) => {
               const isInWishlist = wishlistItems.some(
                 (i) => i.id === product.id
               );
@@ -241,6 +249,39 @@ const ProductPage = () => {
               );
             })}
           </div>
+
+          {/* Pagination: numbered buttons */}
+          <div className="mt-6 flex items-center justify-center gap-2">
+            {(() => {
+              const pages = [];
+              if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+              } else {
+                pages.push(1);
+                let left = Math.max(2, currentPage - 1);
+                let right = Math.min(totalPages - 1, currentPage + 1);
+                if (left > 2) pages.push("left-ellipsis");
+                for (let i = left; i <= right; i++) pages.push(i);
+                if (right < totalPages - 1) pages.push("right-ellipsis");
+                pages.push(totalPages);
+              }
+
+              return (
+                <nav aria-label="Pagination" className="flex items-center gap-2">
+                  <button disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50">Prev</button>
+                  {pages.map((p) =>
+                    typeof p === "number" ? (
+                      <button key={p} onClick={() => setCurrentPage(p)} className={`px-3 py-2 rounded-md border ${currentPage === p ? "bg-blue-600 text-white border-blue-600" : "bg-white hover:bg-gray-50"}`}>{p}</button>
+                    ) : (
+                      <span key={p} className="px-2 text-zinc-500">…</span>
+                    )
+                  )}
+                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50">Next</button>
+                </nav>
+              );
+            })()}
+          </div>
+          </>
         )}
       </div>
     </section>

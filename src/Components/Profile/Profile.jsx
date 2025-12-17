@@ -4,54 +4,84 @@ import { supabase } from "../../supabaseClient/supabaseClient";
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
+  const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [avatarFile, setAvatarFile] = useState(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Try v2 API
-        let user = null;
-        if (supabase.auth && typeof supabase.auth.getUser === "function") {
-          const { data } = await supabase.auth.getUser();
-          user = data?.user ?? null;
-        }
-
-        // Fallback to v1
-        if (!user && supabase.auth && typeof supabase.auth.user === "function") {
-          user = supabase.auth.user();
-        }
-
-        if (!user) {
-          setError("Not authenticated");
-          setLoading(false);
-          navigate("/login");
-          return;
-        }
-
-        const { data, error: fetchError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (fetchError) throw fetchError;
-
-        setProfile(data || {});
-      } catch (err) {
-        setError(err?.message || "Failed to load profile");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadProfile();
-  }, [navigate]);
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        navigate("/login");
+        return;
+      }
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, phone, avatar_url, role")
+        .eq("id", user.id)
+        .single();
+
+      setProfile(data);
+      setFullName(data?.full_name || "");
+      setPhone(data?.phone || "");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      let avatarUrl = profile.avatar_url;
+
+      if (avatarFile) {
+        const ext = avatarFile.name.split(".").pop();
+        const fileName = `${user.id}.${ext}`;
+
+        await supabase.storage
+          .from("avatars")
+          .upload(fileName, avatarFile, { upsert: true });
+
+        const { data } = supabase.storage
+          .from("avatars")
+          .getPublicUrl(fileName);
+
+        avatarUrl = data.publicUrl;
+      }
+
+      await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName,
+          phone,
+          avatar_url: avatarUrl,
+        })
+        .eq("id", user.id);
+
+      setEditing(false);
+      loadProfile();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -59,62 +89,81 @@ export default function Profile() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div>Loading profile...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-600">{error}</div>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center">Loading profile...</div>;
   }
 
   return (
-    <div className="min-h-screen mt-[120px] flex items-start justify-center bg-gray-50 py-10">
-      <div className="bg-white rounded-lg shadow p-6 w-full max-w-3xl">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">My Profile</h2>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/profile/edit")}
-              className="px-3 py-1 bg-blue-600 text-white rounded"
-            >
-              Edit
-            </button>
-            <button
-              onClick={handleSignOut}
-              className="px-3 py-1 bg-red-500 text-white rounded"
-            >
-              Sign out
-            </button>
+    <div className="min-h-screen bg-gray-100 flex justify-center items-center p-4">
+      <div
+        className="bg-white w-full max-w-xl rounded-2xl shadow-md p-6 cursor-pointer"
+        onClick={() => !editing && setEditing(true)}
+      >
+        <div className="flex flex-col items-center mb-6">
+          <img
+            src={profile.avatar_url || "https://via.placeholder.com/120"}
+            alt="avatar"
+            className="w-28 h-28 rounded-full object-cover mb-3"
+          />
+
+          {editing && (
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setAvatarFile(e.target.files[0])}
+              className="text-sm"
+            />
+          )}
+
+          <span className="mt-2 text-xs text-gray-400">
+            {editing ? "Editing profile" : "Click anywhere to edit"}
+          </span>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-500">Full Name</label>
+            <input
+              value={fullName}
+              disabled={!editing}
+              onChange={(e) => setFullName(e.target.value)}
+              className={`w-full px-3 py-2 rounded-lg border focus:outline-none ${editing ? "bg-white" : "bg-gray-100"}`}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-500">Phone</label>
+            <input
+              value={phone}
+              disabled={!editing}
+              onChange={(e) => setPhone(e.target.value)}
+              className={`w-full px-3 py-2 rounded-lg border focus:outline-none ${editing ? "bg-white" : "bg-gray-100"}`}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-500">Role</label>
+            <div className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 capitalize">
+              {profile.role}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {profile && Object.keys(profile).length > 0 ? (
-            Object.entries(profile).map(([key, value]) => (
-              <div key={key} className="p-3 border rounded">
-                <div className="text-sm text-gray-500">{key}</div>
-                <div className="mt-1 font-medium text-gray-800 break-words">
-                  {value === null || value === undefined ? (
-                    <span className="text-gray-400">—</span>
-                  ) : typeof value === "object" ? (
-                    <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(value, null, 2)}</pre>
-                  ) : (
-                    String(value)
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div>No profile data available.</div>
-          )}
-        </div>
+        {editing && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="mt-6 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        )}
+
+        <button
+          onClick={handleSignOut}
+          className="mt-4 w-full text-sm text-red-500 hover:underline"
+        >
+          Sign out
+        </button>
       </div>
     </div>
   );

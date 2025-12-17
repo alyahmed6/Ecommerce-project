@@ -1,7 +1,7 @@
 import { useSelector, useDispatch } from "react-redux";
 import { removeFromWishlist } from "../../Store/HeartSlice";
 import { addToCart } from "../../Store/CardSlice";
-import { toast, Toaster } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 function Wishlist() {
   const dispatch = useDispatch();
@@ -11,7 +11,6 @@ function Wishlist() {
 
   return (
     <section className="min-h-screen mt-[150px] py-12 px-4 sm:px-6 lg:px-8">
-      <Toaster position="top-right" reverseOrder={false} />
 
       <h2 className="text-3xl font-bold mb-8 text-center">Your Wishlist</h2>
 

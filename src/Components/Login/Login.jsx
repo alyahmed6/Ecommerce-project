@@ -1,15 +1,49 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../../supabaseClient/supabaseClient";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log({ email, password });
-  };
   const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      const user = data.user;
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, phone, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (profile.role === "admin") {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/");
+      }
+
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -23,7 +57,7 @@ export default function Login() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent focus:ring-blue-500"
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-0"
               placeholder="Enter your email"
               required
             />
@@ -35,7 +69,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent focus:ring-blue-500"
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-0"
               placeholder="Enter your password"
               required
             />
@@ -43,19 +77,19 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
         <p className="text-sm text-center mt-4">
           Don’t have an account?{" "}
-          <span 
-           onClick={() => {
-                            navigate("/Sign-up");
-                        }}
-          className="text-blue-600 cursor-pointer hover:underline">
+          <span
+            onClick={() => navigate("/sign-up")}
+            className="text-blue-600 cursor-pointer hover:underline"
+          >
             Sign up
           </span>
         </p>

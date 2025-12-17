@@ -1,7 +1,7 @@
 import { useDispatch, useSelector } from "react-redux";
 import { closeCart } from "../../Store/CartUiSlice";
 import { increaseQty, decreaseQty, removeFromCart } from "../../Store/CardSlice";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 function Cart() {
   const dispatch = useDispatch();
@@ -15,8 +15,7 @@ function Cart() {
 
   return (
     <>
-      <Toaster position="top-right" reverseOrder={false} />
- 
+
       {cartOpen && (
         <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"

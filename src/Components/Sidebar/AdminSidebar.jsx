@@ -5,7 +5,7 @@ const AdminSidebar = () => {
   const navigate = useNavigate();
 
   return (
-    <aside className="w-full md:w-64 bg-white shadow-lg p-6 mt-16 md:mt-0">
+    <aside className="w-full h-screen md:w-64 bg-white shadow-lg p-6 mt-16 md:mt-0">
       <h2 className="text-2xl font-bold mb-6">Menu</h2>
       <nav className="flex flex-col gap-4">
         <button
