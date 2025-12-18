@@ -26,7 +26,7 @@ const Navbar = ({ handleScroll }) => {
 
   const isLoggedIn = !!user;
 
-  // -------------------- LOAD USER & AVATAR --------------------
+
   useEffect(() => {
     let mounted = true;
 
@@ -109,7 +109,6 @@ const Navbar = ({ handleScroll }) => {
     };
   }, []);
 
-  // -------------------- LOGOUT --------------------
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -118,27 +117,25 @@ const Navbar = ({ handleScroll }) => {
     navigate("/");
   };
 
-  // -------------------- JSX --------------------
   return (
     <header className="bg-white fixed top-0 left-0 right-0 shadow-md z-10">
       <nav className="flex min-h-[14vh] max-w-[1500px] mx-auto items-center justify-between px-8">
 
-        {/* LOGO */}
+      
         <Link to="/">
           <h2 className="text-2xl font-extrabold text-zinc-900">APP</h2>
         </Link>
 
-        {/* LINKS */}
+        
         <div className="hidden md:flex gap-8 text-lg font-semibold">
           <Link to="/" className="hover:text-blue-600">Home</Link>
           <Link to="/product" className="hover:text-blue-600">Products</Link>
           <Link to="/About-Us" className="hover:text-blue-600">About Us</Link>
         </div>
 
-        {/* RIGHT SIDE */}
+        
         <div className="flex items-center gap-6">
 
-          {/* SEARCH */}
           <div className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-full border">
             <input
               type="text"
@@ -153,7 +150,6 @@ const Navbar = ({ handleScroll }) => {
             </button>
           </div>
 
-          {/* ICONS */}
           <div className="flex items-center gap-4">
             <Link to="/wishlist" className="relative">
               <FaHeart size={24} />
@@ -174,7 +170,6 @@ const Navbar = ({ handleScroll }) => {
             </button>
           </div>
 
-          {/* PROFILE */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => {

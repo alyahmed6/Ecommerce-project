@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "../../supabaseClient/supabaseClient";
 
 export default function Profile() {
@@ -10,9 +9,11 @@ export default function Profile() {
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [avatarFile, setAvatarFile] = useState(null);
-
-  const navigate = useNavigate();
+  const [imageFile, setImageFile] = useState(null);
+  const [avatarVersion, setAvatarVersion] = useState(null);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("");
+  const [createdAt, setCreatedAt] = useState("");
 
   useEffect(() => {
     loadProfile();
@@ -20,22 +21,27 @@ export default function Profile() {
 
   const loadProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      setLoading(true);
 
-      if (!user) {
-        navigate("/login");
-        return;
-      }
+      const res = await supabase.auth.getUser?.();
+      const user = res?.data?.user ?? res?.user ?? (supabase.auth.user ? supabase.auth.user() : null);
+      if (!user) return;
 
-      const { data } = await supabase
+      setEmail(user.email || "");
+      setCreatedAt(user?.created_at || "");
+
+      const { data, error } = await supabase
         .from("profiles")
         .select("full_name, phone, avatar_url, role")
         .eq("id", user.id)
         .single();
 
+      if (error) throw error;
+
       setProfile(data);
-      setFullName(data?.full_name || "");
-      setPhone(data?.phone || "");
+      setFullName(data.full_name || "");
+      setPhone(data.phone || "");
+      setRole(data.role || "user");
     } catch (err) {
       console.error(err);
     } finally {
@@ -43,127 +49,145 @@ export default function Profile() {
     }
   };
 
+ const uploadImage = async () => {
+  if (!imageFile) return null;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const ext = imageFile.name.split(".").pop();
+  const fileName = `${Date.now()}.${ext}`;
+  const filePath = `${user.id}/${fileName}`;
+
+  const { error } = await supabase.storage
+    .from("avatars")  
+    .upload(filePath, imageFile, {
+      upsert: true,
+      contentType: imageFile.type,
+    });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage
+    .from("avatars")
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+};
+
   const handleSave = async () => {
     try {
       setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
 
-      let avatarUrl = profile.avatar_url;
+      const res2 = await supabase.auth.getUser?.();
+      const user2 = res2?.data?.user ?? res2?.user ?? (supabase.auth.user ? supabase.auth.user() : null);
+      if (!user2) return;
 
-      if (avatarFile) {
-        const ext = avatarFile.name.split(".").pop();
-        const fileName = `${user.id}.${ext}`;
+      let avatarUrl = profile?.avatar_url ?? null;
 
-        await supabase.storage
-          .from("avatars")
-          .upload(fileName, avatarFile, { upsert: true });
-
-        const { data } = supabase.storage
-          .from("avatars")
-          .getPublicUrl(fileName);
-
-        avatarUrl = data.publicUrl;
+      if (imageFile) {
+        avatarUrl = await uploadImage(user2.id);
+        setAvatarVersion(Date.now());
       }
 
       await supabase
         .from("profiles")
-        .update({
-          full_name: fullName,
-          phone,
-          avatar_url: avatarUrl,
-        })
-        .eq("id", user.id);
+        .upsert(
+          {
+            id: user2.id,
+            full_name: fullName,
+            phone,
+            avatar_url: avatarUrl,
+            role,
+          },
+          { returning: "minimal" }
+        );
 
-      setEditing(false);
-      loadProfile();
+        setEditing(false);
+      setImageFile(null);
+      await loadProfile();
     } catch (err) {
-      alert(err.message);
+      alert(err.message || err);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-  };
-
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading profile...</div>;
+    return (
+      <div className="h-screen flex items-center justify-center"> 
+        <div className="text-gray-600">Loading profile...</div>
+      </div>
+    );
   }
 
+  if (!profile) return null;
+
+  const previewUrl = imageFile ? URL.createObjectURL(imageFile) : null;
+  const avatarSrc = (profile.avatar_url || "https://via.placeholder.com/160") + (avatarVersion ? `?v=${avatarVersion}` : "");
+
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center items-center p-4">
-      <div
-        className="bg-white w-full max-w-xl rounded-2xl shadow-md p-6 cursor-pointer"
-        onClick={() => !editing && setEditing(true)}
-      >
-        <div className="flex flex-col items-center mb-6">
-          <img
-            src={profile.avatar_url || "https://via.placeholder.com/120"}
-            alt="avatar"
-            className="w-28 h-28 rounded-full object-cover mb-3"
-          />
+    <div className="min-h-screen mt-[100px] bg-gray-50 py-12">
+      <div className="max-w-4xl mx-auto bg-white shadow rounded-lg overflow-hidden">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div className="flex flex-col items-center md:items-start md:col-span-1">
+            <div className="w-36 h-36 rounded-full overflow-hidden bg-gray-100">
+              <img
+                src={previewUrl || avatarSrc}
+                alt="avatar"
+                className="w-full h-full object-cover"
+              />
+            </div>
 
-          {editing && (
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setAvatarFile(e.target.files[0])}
-              className="text-sm"
-            />
-          )}
-
-          <span className="mt-2 text-xs text-gray-400">
-            {editing ? "Editing profile" : "Click anywhere to edit"}
-          </span>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-gray-500">Full Name</label>
-            <input
-              value={fullName}
-              disabled={!editing}
-              onChange={(e) => setFullName(e.target.value)}
-              className={`w-full px-3 py-2 rounded-lg border focus:outline-none ${editing ? "bg-white" : "bg-gray-100"}`}
-            />
+            {editing &&
+              <label className="mt-3 text-sm text-gray-600 cursor-pointer inline-block px-3 py-1 rounded bg-gray-100">
+                Choose image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setImageFile(e.target.files[0])}
+                />
+              </label>
+           }
           </div>
 
-          <div>
-            <label className="text-sm text-gray-500">Phone</label>
-            <input
-              value={phone}
-              disabled={!editing}
-              onChange={(e) => setPhone(e.target.value)}
-              className={`w-full px-3 py-2 rounded-lg border focus:outline-none ${editing ? "bg-white" : "bg-gray-100"}`}
-            />
-          </div>
+          <div className="md:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-semibold">My Profile</h2>
+              {!editing ? (
+                <button onClick={() => setEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded">Edit</button>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditing(false); setImageFile(null); }} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                  <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded">{saving ? 'Saving...' : 'Save'}</button>
+                </div>
+              )}
+            </div>
 
-          <div>
-            <label className="text-sm text-gray-500">Role</label>
-            <div className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 capitalize">
-              {profile.role}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-500">Full name</label>
+                <input value={fullName} disabled={!editing} onChange={(e) => setFullName(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-500">Phone</label>
+                <input value={phone} disabled={!editing} onChange={(e) => setPhone(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-500">Email</label>
+                <input value={email} disabled className="w-full mt-1 p-2 border rounded bg-gray-50" />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-500">Member since</label>
+                <input value={createdAt ? new Date(createdAt).toLocaleDateString() : ""} disabled className="w-full mt-1 p-2 border rounded bg-gray-50" />
+              </div>
             </div>
           </div>
         </div>
-
-        {editing && (
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="mt-6 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        )}
-
-        <button
-          onClick={handleSignOut}
-          className="mt-4 w-full text-sm text-red-500 hover:underline"
-        >
-          Sign out
-        </button>
       </div>
     </div>
   );
