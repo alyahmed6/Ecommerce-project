@@ -3,6 +3,7 @@
   import Home from "./Components/Home/Home";
   import Wishlist from "./Components/Wishlist/Wishlist";
   import ProductPage from "./Components/ProductPage/ProductPage";
+  import ProdcutDetails from "./ProductDetails/ProdcutDetails";
   import Login from "./Components/Login/Login";
   import Profile from "./Components/Profile/Profile";
 
@@ -23,6 +24,7 @@
           <Route path="/login" element={<Login />} />
           <Route path="/Sign-up" element={<Signup />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/product/:id" element={<ProdcutDetails />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/About-Us" element={<AboutUs />} />
           <Route path="/product" element={<ProductPage />} />
