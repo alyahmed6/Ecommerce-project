@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../supabaseClient/supabaseClient";
 import toast from "react-hot-toast";
 import { FaPlus, FaUpload } from "react-icons/fa";
 
-const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On Sale"] }) => {
+const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On Sale"], productId = null, onSaved = null }) => {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState(categories[0]);
@@ -11,10 +11,6 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
   const [imagePreviews, setImagePreviews] = useState([]);
   const [description, setDescription] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
-  const [variants, setVariants] = useState(""); 
-  const [sku, setSku] = useState("");
-  const [stock, setStock] = useState(0);
-  const [originalPrice, setOriginalPrice] = useState("");
   const [loading, setLoading] = useState(false);
 
   const uploadImages = async () => {
@@ -51,40 +47,55 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
         .replace(/^-+|-+$/g, "");
       const slug = `${slugBase}-${Date.now().toString().slice(-5)}`;
 
-      const variantsArr = variants
-        ? variants.split(",").map((v) => v.trim()).filter(Boolean)
-        : [];
-
       const payload = {
         name,
         price: Number(price),
-        original_price: originalPrice ? Number(originalPrice) : null,
         category,
         image_url: imageUrl,
         images: imagesField,
         description,
         additional_info: additionalInfo,
-        variants: variantsArr.length ? JSON.stringify(variantsArr) : null,
-        sku: sku || `sku-${Math.floor(Math.random() * 100000)}`,
-        stock: Number(stock) || 0,
         slug,
+       
       };
 
-      const { error } = await supabase.from("products").insert([payload]);
-      if (error) throw error;
-      toast.success("Product uploaded!");
+      try {
+        const maybeGet = supabase.auth.getUser ? await supabase.auth.getUser() : null;
+        const maybeUser = maybeGet?.data?.user ?? (supabase.auth.user ? supabase.auth.user() : null);
+        const userId = maybeUser?.id ?? null;
+        if (userId) payload.user_id = userId;
+      } catch (e) {
+        console.warn("Could not resolve current user id", e);
+      }
+
+      let error = null;
+      if (productId) {
       
-      setName("");
-      setPrice("");
-      setCategory(categories[0]);
-      setImageFiles([]);
-      setImagePreviews([]);
-      setDescription("");
-      setAdditionalInfo("");
-      setVariants("");
-      setSku("");
-      setStock(0);
-      setOriginalPrice("");
+        const { error: upErr } = await supabase.from("products").update(payload, { returning: "minimal" }).eq("id", productId);
+        error = upErr;
+      } else {
+       
+        const { error: insErr } = await supabase.from("products").insert([payload], { returning: "minimal" });
+        error = insErr;
+      }
+      if (error) throw error;
+      toast.success(productId ? "Product updated!" : "Product uploaded!");
+
+      if (!productId) {
+        setName("");
+        setPrice("");
+        setCategory(categories[0]);
+        setImageFiles([]);
+        setImagePreviews([]);
+        setDescription("");
+        setAdditionalInfo("");
+        setVariants("");
+        setSku("");
+        setStock(0);
+        setOriginalPrice("");
+      } else if (onSaved) {
+        onSaved();
+      }
     } catch (err) {
       console.error(err);
       toast.error("Failed to upload product");
@@ -98,6 +109,64 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
     setImageFiles(files);
     setImagePreviews(files.map((f) => URL.createObjectURL(f)));
   };
+
+  useEffect(() => {
+    if (!productId) return;
+    let mounted = true;
+    const load = async () => {
+      try {
+        const { data, error } = await supabase.from("products").select("*").eq("id", productId).single();
+        if (error) throw error;
+        if (!mounted) return;
+        const p = data;
+        setName(p.name || "");
+        setPrice(p.price || "");
+        setCategory(p.category || categories[0]);
+        setDescription(p.description || "");
+        setAdditionalInfo(p.additional_info || "");
+        
+
+        setImagePreviews(
+          p.images
+            ? Array.isArray(p.images)
+              ? p.images
+              : (() => {
+                  try {
+                    return JSON.parse(p.images);
+                  } catch {
+                    return [];
+                  }
+                })()
+            : p.image_url
+            ? [p.image_url]
+            : []
+        );
+        setImageFiles([]);
+        setVariants(
+          p.variants
+            ? typeof p.variants === "string"
+              ? (() => {
+                  try {
+                    const v = JSON.parse(p.variants);
+                    return Array.isArray(v) ? v.join(",") : p.variants;
+                  } catch {
+                    return p.variants;
+                  }
+                })()
+              : Array.isArray(p.variants)
+              ? p.variants.join(",")
+              : p.variants
+            : ""
+        );
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [productId]);
 
   return (
     <div className=" mt-[88px] bg-white shadow-lg rounded-2xl p-8 w-full max-w-xl mx-auto">
@@ -121,14 +190,7 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
           onChange={(e) => setPrice(e.target.value)}
         />
 
-        <input
-          type="number"
-          className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
-          placeholder="Original Price (optional)"
-          value={originalPrice}
-          onChange={(e) => setOriginalPrice(e.target.value)}
-        />
-
+       
 
         <select
           className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
@@ -140,21 +202,6 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
           ))}
         </select>
 
-        <input
-          type="text"
-          className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
-          placeholder="SKU (optional)"
-          value={sku}
-          onChange={(e) => setSku(e.target.value)}
-        />
-
-        <input
-          type="number"
-          className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
-          placeholder="Stock"
-          value={stock}
-          onChange={(e) => setStock(e.target.value)}
-        />
 
         <textarea
           className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
@@ -172,13 +219,6 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
           rows={3}
         />
 
-        <input
-          type="text"
-          className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
-          placeholder="Variants (comma separated, e.g. Red,Blue,Green)"
-          value={variants}
-          onChange={(e) => setVariants(e.target.value)}
-        />
 
         <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 transition-colors bg-gray-50">
           {imagePreviews && imagePreviews.length ? (

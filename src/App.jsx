@@ -11,6 +11,7 @@
   import AdminLayout from "./Layout/AdminLayout";
   import Dashboard from "./Components/Dashboard/Dashboard";
   import AdminProductForm from "./Components/form/AdminProductForm";
+  import AdminEditProduct from "./Components/form/AdminEditProduct";
   import AdminProfile from "./Components/AdminProfile/Admin-Profile";
   import Signup from "./Components/Sign-up/Signup";
   import AboutUs from "./Components/AboutUs/AboutUs";
@@ -34,6 +35,7 @@
         <Route element={<AdminLayout />}>
           <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/add-product" element={<AdminProductForm />} />
+          <Route path="/admin/products/edit/:id" element={<AdminEditProduct />} />
           <Route path="/Admin/profile" element={<AdminProfile />} />
         </Route>
       </Routes>
