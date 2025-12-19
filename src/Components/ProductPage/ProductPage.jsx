@@ -48,7 +48,7 @@ const ProductPage = () => {
 
     let query = supabase
       .from("products")
-      .select("id, name, image_url, price, category");
+      .select("id, slug, name, image_url, price, category");
 
     if (category !== "All") {
       query = query.eq("category", category);
@@ -212,7 +212,7 @@ const ProductPage = () => {
 
                   <div className="mt-4 flex flex-col gap-3">
                     <Link
-                      to={`/product/${product.id}`}
+                      to={`/product/${product.slug || product.id}`}
                       className="border py-2 rounded-xl text-center hover:bg-gray-100"
                     >
                       View Product
@@ -250,7 +250,7 @@ const ProductPage = () => {
             })}
           </div>
 
-          {/* Pagination: numbered buttons */}
+          
           <div className="mt-6 flex items-center justify-center gap-2">
             {(() => {
               const pages = [];

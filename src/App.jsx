@@ -24,7 +24,7 @@
           <Route path="/login" element={<Login />} />
           <Route path="/Sign-up" element={<Signup />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/product/:id" element={<ProdcutDetails />} />
+          <Route path="/product/:slug" element={<ProdcutDetails />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/About-Us" element={<AboutUs />} />
           <Route path="/product" element={<ProductPage />} />
