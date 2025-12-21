@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient/supabaseClient";
 import { useNavigate } from "react-router-dom";
 
-const Dashboard = ( ) => {
+const Dashboard = () => {
   const [myProducts, setMyProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
