@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "../supabaseClient/supabaseClient";
 import { useDispatch } from "react-redux";
 import { addToCart } from "../Store/CardSlice";
-import ReactMarkdown from "react-markdown";
+
 
 
 export default function ProdcutDetails() {
@@ -20,7 +20,15 @@ export default function ProdcutDetails() {
     const [quantity, setQuantity] = useState(1);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [activeTab, setActiveTab] = useState("description");
+    const [reviews, setReviews] = useState([]);
+    const [loadingReviews, setLoadingReviews] = useState(false);
+    const [reviewName, setReviewName] = useState("");
+    const [reviewText, setReviewText] = useState("");
+    const [reviewRating, setReviewRating] = useState(0);
+    const [submittingReview, setSubmittingReview] = useState(false);
+    
 
+    
     useEffect(() => {
         if (!slug) return;
 
@@ -68,6 +76,14 @@ export default function ProdcutDetails() {
                         .limit(4);
                     if (!rel.error && rel.data) setRelated(rel.data);
                 }
+
+                
+                try {
+                    const rev = await supabase.from("reviews").select("id,product_id,rating,comment,name,created_at").eq("product_id", data.id).order("created_at", { ascending: false });
+                    if (!rev.error && rev.data) setReviews(rev.data);
+                } catch (e) {
+                
+                }
             } catch (err) {
                 setError(err.message || String(err));
             } finally {
@@ -110,6 +126,54 @@ export default function ProdcutDetails() {
         }
     };
 
+    const fetchReviews = async (productId) => {
+        setLoadingReviews(true);
+        try {
+            const { data, error } = await supabase.from("reviews").select("id,product_id,rating,comment,name,created_at").eq("product_id", productId).order("created_at", { ascending: false });
+            if (!error && data) setReviews(data);
+        } catch (e) {
+          
+        } finally {
+            setLoadingReviews(false);
+        }
+    };
+
+    const submitReview = async () => {
+        if (!product) return;
+        if (!reviewRating || !reviewText.trim()) {
+            alert("Please provide a rating and review text.");
+            return;
+        }
+        setSubmittingReview(true);
+        try {
+            const maybeGet = supabase.auth.getUser ? await supabase.auth.getUser() : null;
+            const maybeUser = maybeGet?.data?.user ?? (supabase.auth.user ? supabase.auth.user() : null);
+            const userId = maybeUser?.id ?? null;
+
+            const payload = {
+                product_id: product.id,
+                rating: Number(reviewRating),
+                comment: reviewText,
+                name: reviewName || (maybeUser?.email ?? "Anonymous"),
+                user_id: userId,
+            };
+
+            const { error } = await supabase.from("reviews").insert([payload], { returning: "minimal" });
+            if (error) throw error;
+           
+            await fetchReviews(product.id);
+            setReviewName("");
+            setReviewText("");
+            setReviewRating(0);
+            
+        } catch (e) {
+            console.error(e);
+            alert("Failed to submit review.");
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
+
 
     if (loading) return <div className="min-h-screen flex items-center justify-center">Loading product...</div>;
     if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
@@ -117,23 +181,47 @@ export default function ProdcutDetails() {
 
     const images = Array.isArray(product.images) ? product.images : parseImagesField(product);
 
-    const rating = Number(product?.rating) || 0;
+    const rating =
+    reviews.length > 0
+        ? Math.round(
+            reviews.reduce((sum, r) => sum + Number(r.rating || 0), 0) /
+            reviews.length
+          )
+        : Number(product?.rating) || 0;
     const originalPrice = product?.original_price || null;
     const onSale = originalPrice && Number(originalPrice) > Number(product?.price || 0);
 
     return (
-        <div className="min-h-screen mt-[120px] bg-gray-50 py-12">
-            <div className="max-w-6xl mx-auto p-4">
+        <div className="min-h-screen mt-15 bg-gray-50 py-12">
+            <div className="p-4 max-w-[1500px] mx-auto">
+                
+                <nav className="text-sm text-gray-600 mb-3" aria-label="Breadcrumb">
+                    <ol className="list-none p-0 inline-flex items-center gap-2">
+                        <li>
+                            <Link to="/" className="text-gray-600 hover:underline">Home</Link>
+                        </li>
+                        <li className="text-gray-400">/</li>
+                        <li>
+                            {product?.category ? (
+                                <Link to={`/product?category=${encodeURIComponent(product.category)}`} className="text-gray-600 hover:underline">{product.category}</Link>
+                            ) : (
+                                <span className="text-gray-600">Products</span>
+                            )}
+                        </li>
+                        <li className="text-gray-400">/</li>
+                        <li className="text-gray-800 font-medium truncate max-w-[500px]">{product?.name}</li>
+                    </ol>
+                </nav>
                 <div className="bg-white rounded shadow p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
-                            <div className="relative h-full">
+                            <div className="relative h-88 rounded overflow-hidden ">
                                 {onSale && (
                                     <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">SALE</div>
                                 )}
-                                <div className=" flex items-center justify-center bg-gray-100 overflow-hidden">
+                                <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200 overflow-hidden">
                                     {mainImage ? (
-                                        <img src={mainImage} alt={product.name} className="w-full object-fill" />
+                                        <img src={mainImage} alt={product.name} className="w-full h-full object-contain" />
                                     ) : (
                                         <div className="text-gray-400">No image</div>
                                     )}
@@ -141,12 +229,12 @@ export default function ProdcutDetails() {
                             </div>
 
                             {images.length > 1 && (
-                                <div className="mt-4 flex gap-3 overflow-x-auto">
+                                <div className="mt-3 flex gap-3 overflow-x-auto items-center">
                                     {images.map((src, i) => (
                                         <button
                                             key={i}
                                             onClick={() => setMainImage(src)}
-                                            className="w-20 h-20 rounded overflow-hidden border hover:scale-105 transform transition">
+                                            className={`w-20 h-20 rounded overflow-hidden border ${mainImage===src? 'ring-2 ring-blue-500':''}  transform transition`}>
                                             <img src={src} alt={`${product.name || "product"}-${i}`} className="w-full h-full object-cover" />
                                         </button>
                                     ))}
@@ -159,14 +247,21 @@ export default function ProdcutDetails() {
                                 <div>
                                     <h1 className="text-3xl font-semibold">{product.name}</h1>
                                     <div className="mt-2 flex items-center gap-3">
-                                        <div className="flex items-center text-yellow-400">
-                                            {Array.from({ length: 5 }).map((_, i) => (
-                                                <svg key={i} className={`w-4 h-4 ${i < rating ? "text-yellow-400" : "text-gray-300"}`} viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.955a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.37 2.447a1 1 0 00-.364 1.118l1.287 3.955c.3.921-.755 1.688-1.54 1.118L10 13.347l-3.37 2.447c-.784.57-1.84-.197-1.54-1.118l1.287-3.955a1 1 0 00-.364-1.118L2.643 9.382c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69L9.049 2.927z" />
-                                                </svg>
-                                            ))}
-                                        </div>
-                                        <div className="text-sm text-gray-500">({product.reviews_count || 0} reviews)</div>
+                                        <div className="flex items-center">
+  {Array.from({ length: 5 }).map((_, i) => (
+    <svg
+      key={i}
+      className={`w-4 h-4 ${
+        i < rating ? "text-yellow-400" : "text-gray-300"
+      }`}
+      viewBox="0 0 20 20"
+      fill="currentColor"
+    >
+      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.955a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.37 2.447a1 1 0 00-.364 1.118l1.287 3.955c.3.921-.755 1.688-1.54 1.118L10 13.347l-3.37 2.447c-.784.57-1.84-.197-1.54-1.118l1.287-3.955a1 1 0 00-.364-1.118L2.643 9.382c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69L9.049 2.927z" />
+    </svg>
+  ))}
+</div>
+                                        <div className="text-sm text-gray-500">({reviews.length} reviews)</div>
                                     </div>
                                 </div>
                                 <div className="text-2xl font-bold text-gray-900">
@@ -180,8 +275,6 @@ export default function ProdcutDetails() {
                             </div>
 
                             <div className="text-sm text-gray-600 mb-4">{product.category || ""}</div>
-
-                            <div className="text-gray-800 leading-relaxed mb-4">{product.description}</div>
 
                             <div className="flex items-center gap-4 mb-4">
                                 <div className="flex items-center gap-2">
@@ -217,11 +310,11 @@ export default function ProdcutDetails() {
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 items-center mb-6">
-                                <button onClick={handleAddToCart} className="px-6 py-3 bg-black text-white rounded text-sm font-semibold">ADD TO CART</button>
-                                <button className="px-6 py-3 bg-blue-700 rounded text-white font-semibold text-sm">Buy Now</button>
-                                <button onClick={() => navigator.share ? navigator.share({ title: product.name, url: window.location.href }) : navigate("/share")} className="px-3 py-3 text-sm text-gray-600">Share</button>
-                            </div>
+                                            <div className="flex flex-wrap gap-3 items-center mb-6">
+                                                <button onClick={handleAddToCart} className="px-6 py-3 bg-black hover:bg-black-600 text-white rounded text-sm font-semibold shadow">Add to cart</button>
+                                                <button onClick={() => { navigate(`/checkout?product=${product.id}`) }} className="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded text-white font-semibold text-sm shadow">Buy Now</button>
+                                                <button onClick={() => navigator.share ? navigator.share({ title: product.name, url: window.location.href }) : navigate("/share")} className="px-3 py-2 text-sm text-gray-600">Share</button>
+                                            </div>
 
                             <div className="pt-4 border-t text-sm text-gray-500">
                                 <div>SKU: {product.sku || "—"}</div>
@@ -257,7 +350,74 @@ export default function ProdcutDetails() {
                             
 
                             {activeTab === "reviews" && (
-                                <div className="text-gray-700">{product.reviews || "No reviews yet."}</div>
+                                <div className="text-gray-700">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="md:col-span-1 bg-white p-4 rounded shadow">
+                                            <div className="text-center">
+                                                <div className="text-4xl font-bold">{reviews && reviews.length ? ( (reviews.reduce((s,r)=>s+r.rating,0)/reviews.length).toFixed(1) ) : (product.rating ? Number(product.rating).toFixed(1) : '0.0')}</div>
+                                                <div className="text-sm text-gray-500">Average Rating</div>
+                                            </div>
+
+                                            <div className="mt-4 space-y-2">
+                                                {Array.from({ length: 5 }).map((_, i) => {
+                                                    const star = 5 - i;
+                                                    const count = reviews ? reviews.filter(r => Number(r.rating) === star).length : 0;
+                                                    const pct = reviews && reviews.length ? Math.round((count / reviews.length) * 100) : 0;
+                                                    return (
+                                                        <div key={star} className="flex items-center gap-3">
+                                                            <div className="w-8 text-sm">{star}★</div>
+                                                            <div className="flex-1 bg-gray-100 h-3 rounded overflow-hidden">
+                                                                <div style={{ width: `${pct}%` }} className="h-3 bg-yellow-400"></div>
+                                                            </div>
+                                                            <div className="w-8 text-sm text-gray-600 text-right">{count}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="md:col-span-2 bg-white p-4 rounded shadow">
+                                            <div className="mb-4">
+                                                <div className="text-lg font-semibold mb-2">Write a review</div>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    {Array.from({ length: 5 }).map((_, i) => {
+                                                        const val = i + 1;
+                                                        return (
+                                                            <button key={i} onClick={() => setReviewRating(val)} className={`text-2xl ${reviewRating >= val ? 'text-yellow-400' : 'text-gray-300'}`}>
+                                                                ★
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <input value={reviewName} onChange={(e)=>setReviewName(e.target.value)} placeholder="Your name" className="w-full mb-2 p-2 border rounded" />
+                                                <textarea value={reviewText} onChange={(e)=>setReviewText(e.target.value)} placeholder="Write your review" className="w-full p-2 border rounded mb-2" rows={4} />
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-sm text-gray-500">{reviews && reviews.length ? `${reviews.length} review(s)` : 'No reviews yet'}</div>
+                                                    <button onClick={submitReview} disabled={submittingReview} className="px-4 py-2 bg-blue-600 text-white rounded">{submittingReview ? 'Submitting...' : 'Submit Review'}</button>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 space-y-4">
+                                                {loadingReviews ? (
+                                                    <div>Loading reviews...</div>
+                                                ) : reviews && reviews.length ? (
+                                                    reviews.map(r => (
+                                                        <div key={r.id} className="border rounded p-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="font-medium">{r.name || 'Anonymous'}</div>
+                                                                <div className="text-sm text-gray-600">{new Date(r.created_at).toLocaleDateString()}</div>
+                                                            </div>
+                                                            <div className="text-yellow-400">{Array.from({length: r.rating}).map((_,i)=>(<span key={i}>★</span>))}</div>
+                                                            <div className="mt-2 text-gray-700">{r.comment}</div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="text-gray-500">No reviews yet — be the first to write one.</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
