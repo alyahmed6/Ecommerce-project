@@ -3,7 +3,7 @@
   import Home from "./Components/Home/Home";
   import Wishlist from "./Components/Wishlist/Wishlist";
   import ProductPage from "./Components/ProductPage/ProductPage";
-  import ProdcutDetails from "./ProductDetails/ProdcutDetails";
+  import ProdcutDetails from "./Components/ProductDetails/ProdcutDetails";
   import Login from "./Components/Login/Login";
   import Profile from "./Components/Profile/Profile";
 

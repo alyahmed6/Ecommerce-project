@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient/supabaseClient";
 import ProfileLoader from "../Loader/ProfileLoader";
+import { useNavigate } from "react-router-dom";
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
@@ -16,7 +17,8 @@ export default function Profile() {
   const [role, setRole] = useState("");
   const [createdAt, setCreatedAt] = useState("");
 
-  // ================= LOAD PROFILE =================
+ const navigate = useNavigate();
+
   const loadProfile = async () => {
     try {
       setLoading(true);
@@ -51,7 +53,7 @@ export default function Profile() {
     }
   };
 
-  // ================= ON AUTH STATE CHANGE =================
+ 
   useEffect(() => {
     // Check if a session exists on mount
     const checkSession = async () => {
@@ -98,7 +100,7 @@ export default function Profile() {
     return data.publicUrl;
   };
 
-  // ================= SAVE PROFILE =================
+ 
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -135,7 +137,7 @@ export default function Profile() {
     }
   };
 
-  // ================= UI STATES =================
+
   if (loading) return <ProfileLoader />;
   if (!profile)
     return (
@@ -149,13 +151,13 @@ export default function Profile() {
     (profile.avatar_url || "https://via.placeholder.com/160") +
     (avatarVersion ? `?v=${avatarVersion}` : "");
 
-  // ================= RENDER =================
+  
   return (
     <div className="min-h-screen mt-[100px] bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto bg-white shadow rounded-lg overflow-hidden">
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
 
-          {/* Avatar */}
+         
           <div className="flex flex-col items-center md:items-start">
             <div className="w-36 h-36 rounded-full overflow-hidden bg-gray-100">
               <img
@@ -177,10 +179,11 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Info */}
+          
           <div className="md:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold">My Profile</h2>
+              <div className="flex gap-4">
               {!editing ? (
                 <button
                   onClick={() => setEditing(true)}
@@ -208,6 +211,13 @@ export default function Profile() {
                   </button>
                 </div>
               )}
+              <button
+                  onClick={() => navigate("/admin/dashboard")}
+                  className="px-4 py-2 bg-blue-600 text-white rounded"
+                >
+                  Admin Panal
+                </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -14,6 +14,12 @@ const AdminNavbar = () => {
       <div className="max-w-7xl mx-auto px-6 h-full flex justify-between items-center">
         <h1 className="text-xl font-bold">Admin Panel</h1>
         <div className="flex items-center gap-4">
+           <button
+                  onClick={() => navigate("/")}
+                  className="px-4 py-2 bg-blue-600 text-white rounded"
+                >
+                  Home
+                </button>
           <button
           onClick={handlelogout}
           className="text-red-600 flex items-center cursor-pointer gap-1">
