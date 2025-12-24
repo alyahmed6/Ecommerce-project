@@ -26,7 +26,6 @@ const Navbar = ({ handleScroll }) => {
 
   const isLoggedIn = !!user;
 
-
   useEffect(() => {
     let mounted = true;
 
@@ -110,30 +109,32 @@ const Navbar = ({ handleScroll }) => {
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setAvatarUrl(null);
-    setOpen(false);
-    navigate("/");
+    try {
+      localStorage.clear();
+      await supabase.auth.signOut();
+      setUser(null);
+      setAvatarUrl(null);
+      setOpen(false);
+      navigate("/");
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
   };
 
   return (
-    <header className="bg-white fixed top-0 left-0 right-0 shadow-md z-10">
-      <nav className="flex min-h-[14vh] max-w-[1500px] mx-auto items-center justify-between px-8">
+    <header className="bg-white fixed top-0 left-0 right-0 shadow-md h-23 z-10">
+      <nav className="flex max-w-7xl mx-auto py-5 px-6 h-full items-center justify-between ">
 
-      
         <Link to="/">
           <h2 className="text-2xl font-extrabold text-zinc-900">APP</h2>
         </Link>
 
-        
         <div className="hidden md:flex gap-8 text-lg font-semibold">
           <Link to="/" className="hover:text-blue-600">Home</Link>
           <Link to="/product" className="hover:text-blue-600">Products</Link>
           <Link to="/About-Us" className="hover:text-blue-600">About Us</Link>
         </div>
 
-        
         <div className="flex items-center gap-6">
 
           <div className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-full border">
@@ -175,11 +176,11 @@ const Navbar = ({ handleScroll }) => {
               onClick={() => {
                 if (!isLoggedIn) {
                   navigate("/login");
-                  return;
+                } else {
+                  setOpen(!open);
                 }
-                setOpen(!open);
               }}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:ring-2 hover:ring-blue-500"
+              className="w-9 h-9 rounded-full flex items-center"
             >
               {avatarUrl ? (
                 <img
@@ -191,8 +192,8 @@ const Navbar = ({ handleScroll }) => {
                 <FaUser size={20} />
               )}
             </button>
-
-            {open && (
+            
+            {open && isLoggedIn && (
               <div className="absolute right-0 mt-3 w-44 bg-white border rounded-xl shadow-lg py-2">
                 <button
                   onClick={() => {

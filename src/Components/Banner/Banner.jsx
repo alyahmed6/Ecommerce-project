@@ -33,7 +33,7 @@ const Banner = () => {
 
   return (
     <section
-      className="h-[70vh] mt-[14vh] bg-cover bg-right max-w-[2000px] mx-auto"
+      className="h-[70vh] mt-[93px] bg-cover bg-right max-w-[2000px] mx-auto"
       style={{ backgroundImage: `url(${BannerImage})` }}
     >
       <div className="pl-6 flex flex-col justify-center h-full gap-2">

@@ -11,6 +11,7 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
   const [imagePreviews, setImagePreviews] = useState([]);
   const [description, setDescription] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
+  const [Stock, setStock] = useState("");
   const [loading, setLoading] = useState(false);
 
   const uploadImages = async () => {
@@ -55,8 +56,8 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
         images: imagesField,
         description,
         additional_info: additionalInfo,
-        slug,
-       
+        stock: Number(Stock),
+        slug: slug,
       };
 
       try {
@@ -189,6 +190,13 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
+        <input
+          type="number"
+          className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
+          placeholder="Stock Quantity"
+          value=  {Stock}
+          onChange={(e) => setStock(e.target.value)}
+        />
 
        
 
@@ -205,7 +213,7 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
 
         <textarea
           className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
-          placeholder="Short Description"
+          placeholder="Description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
@@ -213,7 +221,7 @@ const AdminProductForm = ({ categories = ["Mens", "Womens", "New Arrivals", "On 
 
         <textarea
           className="w-full px-4 py-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none"
-          placeholder="Additional Information (details, specs)"
+          placeholder="Additional Information"
           value={additionalInfo}
           onChange={(e) => setAdditionalInfo(e.target.value)}
           rows={3}

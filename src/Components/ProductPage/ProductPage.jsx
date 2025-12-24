@@ -215,7 +215,6 @@ const ProductPage = () => {
                       to={`/product/${product.slug || product.id}`}
                       className="border py-2 rounded-xl text-center hover:bg-gray-100"
                        onClick={() => {
-                            window.scrollTo(0, 0);
                             navigate("/product");
                         }}
                     >

@@ -168,7 +168,6 @@ function Product({ limit }) {
                     <button
                     className="px-4 py-2 bg-blue-600 text-white rounded"
                         onClick={() => {
-                            window.scrollTo(0, 0);
                             navigate("/product");
                         }}
                     >

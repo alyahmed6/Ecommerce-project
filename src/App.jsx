@@ -15,9 +15,15 @@
   import AdminProfile from "./Components/AdminProfile/Admin-Profile";
   import Signup from "./Components/Sign-up/Signup";
   import AboutUs from "./Components/AboutUs/AboutUs";
+  import ScrollToTop from "./Components/ScrollToTop/ScrollToTop";
+
+  import { UserProvider } from "./Context/UserContext";
 
   const App = () => {
-    return (
+  return (
+    <UserProvider>
+      <ScrollToTop /> 
+
       <Routes>
         {/* ---------- USER LAYOUT ---------- */}
         <Route element={<MainLayout />}>
@@ -39,7 +45,8 @@
           <Route path="/Admin/profile" element={<AdminProfile />} />
         </Route>
       </Routes>
-    );
-  };
+    </UserProvider>
+  );
+};
 
-  export default App;
+export default App;

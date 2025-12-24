@@ -2,15 +2,19 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "../supabaseClient/supabaseClient";
 import { useDispatch } from "react-redux";
-import { addToCart } from "../Store/CardSlice";
+import { addToCart,removeFromCart }  from "../Store/CardSlice";
+import ProductDetailLoader from "../Components/Loader/ProductDetailLoader";
+import { toast } from "react-hot-toast";
+import  {useSelector} from "react-redux";
 
 
 
 export default function ProdcutDetails() {
     const { slug } = useParams();
-
     const navigate = useNavigate();
     const dispatch = useDispatch();
+
+     const cartItems = useSelector((state) => state.cart.items);
 
     const [product, setProduct] = useState(null);
     const [related, setRelated] = useState([]);
@@ -108,23 +112,6 @@ export default function ProdcutDetails() {
         return [];
     };
 
-    const handleAddToCart = () => {
-        if (!product) return;
-        try {
-            dispatch(
-                addToCart({
-                    id: product.id,
-                    title: product.name,
-                    price: product.price,
-                    image: mainImage,
-                    quantity: Number(quantity) || 1,
-                    variant: selectedVariant,
-                })
-            );
-        } catch (err) {
-            console.error(err);
-        }
-    };
 
     const fetchReviews = async (productId) => {
         setLoadingReviews(true);
@@ -174,10 +161,15 @@ export default function ProdcutDetails() {
         }
     };
 
-
-    if (loading) return <div className="min-h-screen flex items-center justify-center">Loading product...</div>;
+if (loading) return <ProductDetailLoader/>;
     if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
     if (!product) return <div className="min-h-screen flex items-center justify-center">Product not found</div>;
+
+
+   
+    const isInCart = cartItems.some(
+                (i) => i.id === product.id
+              );
 
     const images = Array.isArray(product.images) ? product.images : parseImagesField(product);
 
@@ -311,7 +303,19 @@ export default function ProdcutDetails() {
                             </div>
 
                                             <div className="flex flex-wrap gap-3 items-center mb-6">
-                                                <button onClick={handleAddToCart} className="px-6 py-3 bg-black hover:bg-black-600 text-white rounded text-sm font-semibold shadow">Add to cart</button>
+                                                <button onClick={() => {
+                                                                        if (isInCart) {
+                                                                          dispatch(removeFromCart(product.id));
+                                                                          toast.error("Removed from cart");
+                                                                        } else {
+                                                                          dispatch(addToCart(product));
+                                                                          toast.success("Added to cart");
+                                                                        }
+                                                                      }}
+                                                className={`px-6 py-3 bg-black hover:bg-black-600 text-white rounded text-sm 
+                                                font-semibold shadow ${isInCart ? "bg-red-600" : "bg-blue-600"}`}>
+                                                    {isInCart ? "Remove from Cart" : "Add to Cart"}
+                                                    </button>
                                                 <button onClick={() => { navigate(`/checkout?product=${product.id}`) }} className="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded text-white font-semibold text-sm shadow">Buy Now</button>
                                                 <button onClick={() => navigator.share ? navigator.share({ title: product.name, url: window.location.href }) : navigate("/share")} className="px-3 py-2 text-sm text-gray-600">Share</button>
                                             </div>
@@ -328,13 +332,13 @@ export default function ProdcutDetails() {
                             <nav className="flex -mb-px">
                                 <button onClick={() => setActiveTab("description")} className={`px-6 py-3 ${activeTab === "description" ? "border-b-2 border-black" : "text-gray-600"}`}>Description</button>
                                 <button onClick={() => setActiveTab("additional")} className={`px-6 py-3 ${activeTab === "additional" ? "border-b-2 border-black" : "text-gray-600"}`}>Additional Information</button>
-                                <button onClick={() => setActiveTab("reviews")} className={`px-6 py-3 ${activeTab === "reviews" ? "border-b-2 border-black" : "text-gray-600"}`}>Reviews ({product.reviews_count || 0})</button>
+                                <button onClick={() => setActiveTab("reviews")} className={`px-6 py-3 ${activeTab === "reviews" ? "border-b-2 border-black" : "text-gray-600"}`}>Reviews ({reviews.length})</button>
                             </nav>
                         </div>
 
                         <div className="mt-6">
                             {activeTab === "description" && (
-                                <div className="text-gray-700">{product.description}</div>
+                                <div className="text-gray-700">{product.description|| "No description information."}</div>
                             )}
 
                             {activeTab === "additional" && (

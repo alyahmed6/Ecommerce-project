@@ -38,6 +38,12 @@ export default function Login() {
         navigate("/");
       }
 
+       if (profile.role === "user") {
+        navigate("/");
+      } else {
+        navigate("/");
+      }
+
     } catch (error) {
       alert(error.message);
     } finally {
