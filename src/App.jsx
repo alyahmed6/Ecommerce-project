@@ -6,7 +6,7 @@
   import ProdcutDetails from "./Components/ProductDetails/ProdcutDetails";
   import Login from "./Components/Login/Login";
   import Profile from "./Components/Profile/Profile";
-
+import { Toaster } from "react-hot-toast";
   import MainLayout from "./Layout/MainLayout";
   import AdminLayout from "./Layout/AdminLayout";
   import Dashboard from "./Components/Dashboard/Dashboard";
@@ -23,7 +23,7 @@
   return (
     <UserProvider>
       <ScrollToTop /> 
-
+<Toaster position="top-right" reverseOrder={false} />
       <Routes>
         {/* ---------- USER LAYOUT ---------- */}
         <Route element={<MainLayout />}>
