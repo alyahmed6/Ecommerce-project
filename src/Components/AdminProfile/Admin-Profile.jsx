@@ -1,42 +1,60 @@
 import React, { useState, useEffect } from "react";
 import { FaEnvelope, FaPhone, FaUserEdit, FaCamera, FaRegCalendarAlt } from "react-icons/fa";
 import { supabase } from "../../supabaseClient/supabaseClient";
+import ProfileLoader from "../Loader/ProfileLoader";
 
 const AdminProfile = () => {
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [editing, setEditing] = useState(false);
   const [joined, setJoined] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  useEffect(() => {
-    const loadAdmin = async () => {
-      try {
-        const res = await supabase.auth.getUser?.();
-        const user = res?.data?.user ?? res?.user ?? (supabase.auth.user ? supabase.auth.user() : null);
-        if (!user) return;
+ useEffect(() => {
+  const loadAdmin = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user;
 
-        setForm((f) => ({ ...f, email: user.email || "" }));
-        setJoined(user.created_at ? new Date(user.created_at).toLocaleDateString() : "");
-
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("full_name, phone, avatar_url")
-          .eq("id", user.id)
-          .single();
-
-        if (!error && data) {
-          setForm({ name: data.full_name || "", email: user.email || "", phone: data.phone || "" });
-          setAvatarUrl(data.avatar_url || null);
-        }
-      } catch (err) {
-        console.error("Failed to load admin profile", err);
+      if (!user) {
+        console.warn("No user found");
+        return;
       }
-    };
 
-    loadAdmin();
-  }, []);
+      setForm((f) => ({ ...f, email: user.email || "" }));
+      setJoined(
+        user.created_at
+          ? new Date(user.created_at).toLocaleDateString()
+          : ""
+      );
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("full_name, phone, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      if (!error && profile) {
+        setForm({
+          name: profile.full_name || "",
+          email: user.email || "",
+          phone: profile.phone || "",
+        });
+        setAvatarUrl(profile.avatar_url || null);
+      }
+    } catch (err) {
+      console.error("Failed to load admin profile", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadAdmin();
+}, []);
+
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -52,7 +70,7 @@ const AdminProfile = () => {
       alert(err.message || err);
     }
   };
-
+ if (loading) return <ProfileLoader />;
   return (
     <div className="max-w-5xl mt-[100px] mx-auto">
       <div className="bg-white rounded-2xl shadow-md p-6 mb-6 flex flex-col md:flex-row gap-6 items-center">

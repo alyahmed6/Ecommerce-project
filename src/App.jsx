@@ -3,10 +3,10 @@
   import Home from "./Components/Home/Home";
   import Wishlist from "./Components/Wishlist/Wishlist";
   import ProductPage from "./Components/ProductPage/ProductPage";
-  import ProdcutDetails from "./ProductDetails/ProdcutDetails";
+  import ProdcutDetails from "./Components/ProductDetails/ProdcutDetails";
   import Login from "./Components/Login/Login";
   import Profile from "./Components/Profile/Profile";
-
+import { Toaster } from "react-hot-toast";
   import MainLayout from "./Layout/MainLayout";
   import AdminLayout from "./Layout/AdminLayout";
   import Dashboard from "./Components/Dashboard/Dashboard";
@@ -23,7 +23,7 @@
   return (
     <UserProvider>
       <ScrollToTop /> 
-
+<Toaster position="top-right" reverseOrder={false} />
       <Routes>
         {/* ---------- USER LAYOUT ---------- */}
         <Route element={<MainLayout />}>
