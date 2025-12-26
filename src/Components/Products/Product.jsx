@@ -98,7 +98,7 @@ function Product({ limit }) {
                                         key={product.id}
                                         className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col"
                                     >
-                                        <div className="relative pb-[100%] bg-gray-200">
+                                        <div className="relative pb-[100%] bg-gray-200 ">
                                             <img
                                                 src={product.image_url}
                                                 alt={product.name}
@@ -129,7 +129,7 @@ function Product({ limit }) {
                                                 {product.name}
                                             </h3>
 
-                                            <div className="mt-auto flex items-center justify-between">
+                                            <div className="mt-auto flex items-center justify-between ">
                                                 <span className="text-2xl font-bold text-blue-600">
                                                     ${product.price}
                                                 </span>
