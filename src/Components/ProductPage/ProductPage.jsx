@@ -178,7 +178,7 @@ const ProductPage = () => {
                     <img
                       src={product.image_url}
                       alt={product.name}
-                      className="absolute inset-0 w-full h-full object-cover hover:scale-110 transition"
+                      className="absolute inset-0 w-full h-full object-cover hover:scale-110 transition cursor-pointer"
                     />
 
                     <button
@@ -202,7 +202,7 @@ const ProductPage = () => {
                     </button>
                   </div>
 
-                  <h3 className="text-lg font-semibold mt-4 line-clamp-2">
+                  <h3 className="text-lg font-semibold mt-4 line-clamp-2 cursor-pointer">
                     {product.name}
                   </h3>
 
