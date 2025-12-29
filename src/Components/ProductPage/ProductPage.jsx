@@ -6,9 +6,12 @@ import { useSelector, useDispatch } from "react-redux";
 import { addToCart, removeFromCart } from "../../Store/CardSlice";
 import { addToWishlist, removeFromWishlist } from "../../Store/HeartSlice";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
 
 
 const ProductSkeleton = () => {
+  
   return (
     <div className="bg-white rounded-2xl shadow border border-gray-200 p-4 animate-pulse">
       <div className="pb-[110%] bg-gray-300 rounded-xl"></div>
@@ -42,6 +45,7 @@ const ProductPage = () => {
   const cartItems = useSelector((state) => state.cart.items);
   const dispatch = useDispatch();
 
+  const navigate = useNavigate();
   
   async function loadProducts(category) {
     setLoading(true);
@@ -211,15 +215,12 @@ const ProductPage = () => {
                   </p>
 
                   <div className="mt-4 flex flex-col gap-3">
-                    <Link
-                      to={`/product/${product.slug || product.id}`}
+                    <button
+                     onClick={() => navigate(`/product/${product.slug || product.id}`)}
                       className="border py-2 rounded-xl text-center hover:bg-gray-100"
-                       onClick={() => {
-                            navigate("/product");
-                        }}
                     >
                       View Product
-                    </Link>
+                    </button>
 
                     <button
                       className={`py-2 rounded-xl text-white ${

@@ -1,552 +1,537 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "../../supabaseClient/supabaseClient";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { addToCart, removeFromCart } from "../../Store/CardSlice";
 import ProductDetailLoader from "../Loader/ProductDetailLoader";
 import { toast } from "react-hot-toast";
-import { useSelector } from "react-redux";
-import { FaShoppingCart, FaHeart, FaShare, FaTruck, FaShieldAlt, FaUndo, FaStar, FaStarHalfAlt } from "react-icons/fa";
+import { FaShoppingCart, FaTruck, FaShieldAlt, FaUndo, FaStar, FaUserCircle } from "react-icons/fa";
 
 export default function ProductDetails() {
     const { slug } = useParams();
     const navigate = useNavigate();
     const dispatch = useDispatch();
-
-    const cartItems = useSelector((state) => state.cart.items);
+    const cartItems = useSelector((s) => s.cart.items);
 
     const [product, setProduct] = useState(null);
     const [related, setRelated] = useState([]);
+    const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [mainImage, setMainImage] = useState(null);
-    const [quantity, setQuantity] = useState(1);
-    const [selectedVariant, setSelectedVariant] = useState(null);
     const [activeTab, setActiveTab] = useState("description");
-    const [reviews, setReviews] = useState([]);
-    const [loadingReviews, setLoadingReviews] = useState(false);
     const [reviewName, setReviewName] = useState("");
     const [reviewText, setReviewText] = useState("");
     const [reviewRating, setReviewRating] = useState(0);
-    const [submittingReview, setSubmittingReview] = useState(false);
-    const [imageZoom, setImageZoom] = useState(false);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [submitting, setSubmitting] = useState(false);
+
+    const parseImages = (p) => {
+        if (!p) return [];
+        if (Array.isArray(p.images)) return p.images;
+        if (!p.images) return p.image_url ? [p.image_url] : [];
+        try {
+            const v = JSON.parse(p.images);
+            return Array.isArray(v) ? v : [];
+        } catch {
+            return p.images.split(",").map(s => s.trim()).filter(Boolean);
+        }
+    };
+
+    const fetchReviews = async (id) => {
+        try {
+            const { data, error } = await supabase
+                .from("reviews")
+                .select("id,product_id,rating,comment,name,created_at")
+                .eq("product_id", id)
+                .order("created_at", { ascending: false });
+            
+            if (error) {
+                console.error("Reviews fetch error:", error);
+                return;
+            }
+            
+            if (data) setReviews(data);
+        } catch (e) {
+            console.error("Error fetching reviews:", e);
+        }
+    };
 
     useEffect(() => {
         if (!slug) return;
 
+        let cancelled = false;
+
         const load = async () => {
+            if (cancelled) return;
+
             setLoading(true);
             setError(null);
+            setProduct(null);
+            setReviews([]);
+
+            const timeoutId = setTimeout(() => {
+                if (!cancelled) {
+                    setError("Request timed out. Please refresh the page.");
+                    setLoading(false);
+                }
+            }, 15000);
+
             try {
-                let res = await supabase
+
+               
+                const { data: authData } = await supabase.auth.getSession();
+                
+
+               
+                const { data: productData, error: productError } = await supabase
                     .from("products")
                     .select("*")
                     .eq("slug", slug)
-                    .single();
+                    .maybeSingle();
 
-                if (res.error && /multiple rows/i.test(String(res.error.message || res.error))) {
-                    const list = await supabase.from("products").select("*").eq("slug", slug).limit(1);
-                    if (list.error) throw list.error;
-                    res = { data: list.data && list.data[0] ? list.data[0] : null };
+               
+
+                clearTimeout(timeoutId);
+
+                if (cancelled) return;
+
+                if (productError) {
+                    
+                    throw new Error(productError.message || "Failed to load product");
+                }
+                
+                if (!productData) {
+                    throw new Error("Product not found");
                 }
 
-                const { data, error } = res;
-                if (error) throw error;
-                setProduct(data);
-                const parsedImages = parseImagesField(data);
-                const img = (parsedImages && parsedImages.length && parsedImages[0]) || data?.image_url || null;
-                setMainImage(img);
+               
+                setProduct(productData);
 
-                if (data && data.variants) {
-                    try {
-                        const v = typeof data.variants === "string" ? JSON.parse(data.variants) : data.variants;
-                        setSelectedVariant(Array.isArray(v) && v.length ? v[0] : null);
-                    } catch (e) {
-                        setSelectedVariant(null);
-                    }
+                const imgs = parseImages(productData);
+                setMainImage(imgs[0] || null);
+
+                await fetchReviews(productData.id);
+
+                if (cancelled) return;
+
+                
+                const { data: relatedData, error: relatedError } = await supabase
+                    .from("products")
+                    .select("id,name,slug,image_url,images,price")
+                    .eq("category", productData.category)
+                    .neq("id", productData.id)
+                    .limit(4);
+
+                if (relatedError) {
+                   
+                } else if (!cancelled && relatedData) {
+                    setRelated(relatedData);
                 }
 
-                if (data && data.category) {
-                    const rel = await supabase
-                        .from("products")
-                        .select("id,name,slug,image_url,images,price")
-                        .eq("category", data.category)
-                        .neq("id", data.id)
-                        .limit(4);
-                    if (!rel.error && rel.data) setRelated(rel.data);
+            } catch (e) {
+                clearTimeout(timeoutId);
+                if (!cancelled) {
+                    
+                    setError(e.message || "Failed to load product");
                 }
-
-                try {
-                    const rev = await supabase.from("reviews").select("id,product_id,rating,comment,name,created_at").eq("product_id", data.id).order("created_at", { ascending: false });
-                    if (!rev.error && rev.data) setReviews(rev.data);
-                } catch (e) {}
-            } catch (err) {
-                setError(err.message || String(err));
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                  
+                }
             }
         };
 
         load();
+
+        return () => {
+            cancelled = true;
+        };
     }, [slug]);
 
-    const parseImagesField = (prod) => {
-        if (!prod) return [];
-        const raw = prod.images;
-        if (!raw) return prod.image_url ? [prod.image_url] : [];
-        try {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) return parsed;
-            if (typeof parsed === "string") return parsed ? [parsed] : [];
-        } catch (e) {
-            return raw.split(",").map((s) => s.trim()).filter(Boolean);
-        }
-        return [];
-    };
-
-    const fetchReviews = async (productId) => {
-        setLoadingReviews(true);
-        try {
-            const { data, error } = await supabase.from("reviews").select("id,product_id,rating,comment,name,created_at").eq("product_id", productId).order("created_at", { ascending: false });
-            if (!error && data) setReviews(data);
-        } catch (e) {
-        } finally {
-            setLoadingReviews(false);
-        }
-    };
-
     const submitReview = async () => {
-        if (!product) return;
-        if (!reviewRating || !reviewText.trim()) {
-            toast.error("Please provide a rating and review text.");
+        if (!reviewRating) {
+            toast.error("Please select a rating");
             return;
         }
-        setSubmittingReview(true);
-        try {
-            const maybeGet = supabase.auth.getUser ? await supabase.auth.getUser() : null;
-            const maybeUser = maybeGet?.data?.user ?? (supabase.auth.user ? supabase.auth.user() : null);
-            const userId = maybeUser?.id ?? null;
+        if (!reviewText.trim()) {
+            toast.error("Please write a review");
+            return;
+        }
 
+        setSubmitting(true);
+        try {
+            const { data: auth } = await supabase.auth.getUser();
             const payload = {
                 product_id: product.id,
-                rating: Number(reviewRating),
-                comment: reviewText,
-                name: reviewName || (maybeUser?.email ?? "Anonymous"),
-                user_id: userId,
+                rating: reviewRating,
+                comment: reviewText.trim(),
+                name: reviewName.trim() || auth?.user?.email || "Anonymous",
+                user_id: auth?.user?.id || null,
             };
 
-            const { error } = await supabase.from("reviews").insert([payload], { returning: "minimal" });
-            if (error) throw error;
+            const { error } = await supabase.from("reviews").insert([payload]);
+            if (error) {
+                throw error;
+            }
 
-            await fetchReviews(product.id);
             setReviewName("");
             setReviewText("");
             setReviewRating(0);
+            setHoverRating(0);
+            await fetchReviews(product.id);
             toast.success("Review submitted successfully!");
+            setActiveTab("reviews");
         } catch (e) {
-            toast.error("Failed to submit review.");
+           
+            toast.error("Failed to submit review. Please try again.");
         } finally {
-            setSubmittingReview(false);
+            setSubmitting(false);
         }
     };
 
     if (loading) return <ProductDetailLoader />;
-    if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
-    if (!product) return <div className="min-h-screen flex items-center justify-center">Product not found</div>;
+    
+    if (error) return (
+        <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+            <div className="text-center bg-white p-8 rounded-2xl shadow-lg max-w-md">
+                <div className="text-red-600 text-xl mb-4 font-semibold">{error}</div>
+                <p className="text-zinc-600 mb-6 text-sm">
+                    This might be a temporary issue. Please try refreshing or check your connection.
+                </p>
+                <div className="flex gap-3 justify-center">
+                    <button 
+                        onClick={() => window.location.reload()} 
+                        className="px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition"
+                    >
+                        Refresh Page
+                    </button>
+                    <button 
+                        onClick={() => navigate('/')} 
+                        className="px-6 py-3 bg-zinc-200 text-zinc-900 rounded-xl font-bold hover:bg-zinc-300 transition"
+                    >
+                        Go Home
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+    
+    if (!product) return (
+        <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+            <div className="text-center">
+                <div className="text-zinc-600 text-xl mb-4">Product not found</div>
+                <button 
+                    onClick={() => navigate('/')} 
+                    className="px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition"
+                >
+                    Back to Home
+                </button>
+            </div>
+        </div>
+    );
 
-    const isInCart = cartItems.some((i) => i.id === product.id);
-    const images = Array.isArray(product.images) ? product.images : parseImagesField(product);
-    const rating = reviews.length > 0 ? Math.round(reviews.reduce((sum, r) => sum + Number(r.rating || 0), 0) / reviews.length) : Number(product?.rating) || 0;
-    const originalPrice = product?.original_price || null;
-    const onSale = originalPrice && Number(originalPrice) > Number(product?.price || 0);
-    const discount = onSale ? Math.round(((originalPrice - product.price) / originalPrice) * 100) : 0;
+    const images = parseImages(product);
+    const isInCart = cartItems.some(i => i.id === product.id);
+    const avgRating = reviews.length
+        ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+        : 0;
+    const roundedRating = Math.round(avgRating);
+
+    const getRatingBreakdown = () => {
+        const breakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        reviews.forEach(r => breakdown[r.rating]++);
+        return breakdown;
+    };
+
+    const ratingBreakdown = getRatingBreakdown();
+
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
 
     return (
         <div className="min-h-screen bg-zinc-50 mt-[14vh]">
             <div className="max-w-[1400px] mx-auto px-4 py-6">
-                <div className="flex items-center gap-2 text-sm mb-6 text-zinc-600">
-                    <Link to="/" className="hover:text-zinc-900 transition-colors">Home</Link>
+
+                <div className="flex gap-2 text-sm mb-6 text-zinc-600">
+                    <Link to="/" className="hover:text-zinc-900 transition">Home</Link>
                     <span>›</span>
-                    <Link to="/product" className="hover:text-zinc-900 transition-colors">Shop</Link>
-                    <span>›</span>
-                    <span className="text-zinc-900 font-medium truncate">{product?.name}</span>
+                    <span className="text-zinc-900 font-medium">{product.name}</span>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="grid lg:grid-cols-12 gap-8">
                     <div className="lg:col-span-7">
-                        <div className="sticky top-24">
-                            <div className="relative bg-white rounded-3xl p-8 shadow-sm border border-zinc-200 overflow-hidden group">
-                                {onSale && (
-                                    <div className="absolute top-6 right-6 z-20">
-                                        <div className="relative">
-                                            <div className="absolute inset-0 bg-red-500 blur-xl opacity-50"></div>
-                                            <div className="relative bg-gradient-to-br from-red-500 via-red-600 to-pink-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm shadow-2xl">
-                                                -{discount}%
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                <div 
-                                    className={`relative aspect-square rounded-2xl overflow-hidden cursor-zoom-in transition-all duration-500 ${imageZoom ? 'scale-150' : 'scale-100'}`}
-                                    onClick={() => setImageZoom(!imageZoom)}
-                                >
-                                    {mainImage ? (
-                                        <img 
-                                            src={mainImage} 
-                                            alt={product.name} 
-                                            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110" 
-                                        />
-                                    ) : (
-                                        <div className="flex items-center justify-center h-full text-zinc-400">No image</div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {images.length > 1 && (
-                                <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
-                                    {images.map((src, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => setMainImage(src)}
-                                            className={`relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden transition-all duration-300 ${
-                                                mainImage === src 
-                                                    ? 'ring-2 ring-zinc-900 scale-110' 
-                                                    : 'ring-1 ring-zinc-200 hover:ring-zinc-400 opacity-70 hover:opacity-100'
-                                            }`}
-                                        >
-                                            <img src={src} alt="" className="w-full h-full object-cover" />
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                        <div className="bg-white rounded-3xl p-8 border shadow-sm">
+                            {mainImage
+                                ? <img src={mainImage} alt={product.name} className="w-full h-[400px] object-contain" />
+                                : <div className="h-[400px] flex items-center justify-center text-zinc-400">No image available</div>
+                            }
                         </div>
+
+                        {images.length > 1 && (
+                            <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
+                                {images.map((i, idx) => (
+                                    <img 
+                                        key={idx} 
+                                        src={i} 
+                                        alt={`${product.name} ${idx + 1}`}
+                                        onClick={() => setMainImage(i)} 
+                                        className={`w-20 h-20 object-cover rounded-xl border-2 cursor-pointer transition flex-shrink-0 ${
+                                            mainImage === i ? 'border-zinc-900' : 'border-zinc-200 hover:border-zinc-400'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
 
-                    <div className="lg:col-span-5">
-                        <div className="lg:sticky lg:top-24 space-y-6">
-                            <div>
-                                <span className="inline-block px-4 py-1.5 bg-zinc-900 text-white text-xs font-semibold rounded-full mb-4 tracking-wide">
-                                    {product.category || "PRODUCT"}
+                    <div className="lg:col-span-5 space-y-6">
+                        <h1 className="text-4xl font-bold text-zinc-900">{product.name}</h1>
+
+                        <div className="flex gap-2 items-center">
+                            <div className="flex gap-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <FaStar key={i} className={`${i < roundedRating ? "text-amber-400" : "text-zinc-300"} text-lg`} />
+                                ))}
+                            </div>
+                            <span className="text-sm text-zinc-600 font-medium">
+                                {avgRating > 0 ? avgRating.toFixed(1) : '0.0'} ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
+                            </span>
+                        </div>
+
+                        <div className="text-4xl font-black text-zinc-900">${Number(product.price).toFixed(2)}</div>
+
+                        <div className="bg-zinc-100 rounded-xl p-4 space-y-3 text-sm">
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-600">SKU</span>
+                                <span className="font-bold text-zinc-900">{product.sku || "N/A"}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-600">Stock</span>
+                                <span className={`font-bold ${product.stock > 0 ? "text-green-600" : "text-red-600"}`}>
+                                    {product.stock > 0 ? `${product.stock} In Stock` : "Out of Stock"}
                                 </span>
-                                <h1 className="text-4xl font-bold text-zinc-900 mb-3 leading-tight">{product.name}</h1>
-                                
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="flex items-center gap-1">
-                                        {Array.from({ length: 5 }).map((_, i) => (
-                                            <FaStar
-                                                key={i}
-                                                className={`w-4 h-4 ${i < rating ? "text-amber-400" : "text-zinc-300"}`}
-                                            />
-                                        ))}
-                                    </div>
-                                    <span className="text-sm text-zinc-600">({reviews.length})</span>
-                                </div>
-
-                                <div className="flex items-baseline gap-4 mb-8">
-                                    <span className="text-5xl font-black text-zinc-900">
-                                        ${(Number(product.price) || 0).toFixed(2)}
-                                    </span>
-                                    {onSale && (
-                                        <div className="flex flex-col">
-                                            <span className="text-xl text-zinc-400 line-through">
-                                                ${Number(originalPrice).toFixed(2)}
-                                            </span>
-                                            <span className="text-sm text-green-600 font-semibold">Save ${(originalPrice - product.price).toFixed(2)}</span>
-                                        </div>
-                                    )}
-                                </div>
                             </div>
+                        </div>
 
-                            <div className="grid grid-cols-2 gap-4 p-6 bg-gradient-to-br from-zinc-100 to-zinc-50 rounded-2xl border border-zinc-200">
-                                <div>
-                                    <label className="block text-xs font-bold text-zinc-700 mb-2 uppercase tracking-wider">Color</label>
-                                    <select
-                                        value={selectedVariant || ""}
-                                        onChange={(e) => setSelectedVariant(e.target.value)}
-                                        className="w-full px-4 py-3 border-2 border-zinc-300 rounded-xl bg-white focus:border-zinc-900 focus:ring-0 transition-colors font-medium"
-                                    >
-                                        {product?.variants ? (
-                                            (() => {
-                                                try {
-                                                    const v = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants;
-                                                    return Array.isArray(v) && v.length ? v.map((vv, i) => (
-                                                        <option key={i} value={vv}>{vv}</option>
-                                                    )) : <option value="">Default</option>;
-                                                } catch (e) {
-                                                    return <option value="">Default</option>;
-                                                }
-                                            })()
-                                        ) : (
-                                            <option value="">Black</option>
-                                        )}
-                                    </select>
-                                </div>
+                        <button
+                            onClick={() => {
+                                if (isInCart) {
+                                    dispatch(removeFromCart(product.id));
+                                    toast.error("Removed from cart");
+                                } else {
+                                    dispatch(addToCart(product));
+                                    toast.success("Added to cart");
+                                }
+                            }}
+                            disabled={product.stock === 0}
+                            className={`w-full py-4 rounded-xl font-bold transition flex items-center justify-center gap-2 ${
+                                product.stock === 0 
+                                    ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed' 
+                                    : 'bg-zinc-900 text-white hover:bg-zinc-800'
+                            }`}
+                        >
+                            <FaShoppingCart />
+                            {product.stock === 0 ? 'Out of Stock' : (isInCart ? "Remove from Cart" : "Add to Cart")}
+                        </button>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-zinc-700 mb-2 uppercase tracking-wider">Quantity</label>
-                                    <div className="flex items-center  bg-white border-2 border-zinc-300 rounded-xl overflow-hidden">
-                                        <button
-                                            onClick={() => setQuantity((q) => Math.max(1, Number(q) - 1))}
-                                            className="px-5 py-3 hover:bg-zinc-100 transition-colors font-bold text-zinc-700"
-                                        >
-                                            −
-                                        </button>
-                                        <input
-                                            className="flex-1 text-center py-3 w-2 font-bold text-zinc-900 bg-transparent focus:outline-none"
-                                            value={quantity}
-                                            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
-                                        />
-                                        <button
-                                            onClick={() => setQuantity((q) => Number(q) + 1)}
-                                            className="px-5 py-3 hover:bg-zinc-100 transition-colors font-bold text-zinc-700"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-                                </div>
+                        <button
+                            onClick={() => navigate(`/checkout?product=${product.id}`)}
+                            disabled={product.stock === 0}
+                            className={`w-full py-4 rounded-xl font-bold transition ${
+                                product.stock === 0 
+                                    ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed' 
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                        >
+                            Buy Now
+                        </button>
+
+                        <div className="grid grid-cols-3 gap-4 text-center text-sm pt-4 border-t">
+                            <div className="space-y-2">
+                                <FaTruck className="mx-auto text-xl text-zinc-700" />
+                                <div className="font-medium text-zinc-700">Free Delivery</div>
                             </div>
-
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => {
-                                        if (isInCart) {
-                                            dispatch(removeFromCart(product.id));
-                                            toast.error("Removed from cart");
-                                        } else {
-                                            dispatch(addToCart(product));
-                                            toast.success("Added to cart");
-                                        }
-                                    }}
-                                    className={`w-full flex items-center justify-center gap-3 px-8 py-5 rounded-2xl font-bold text-lg shadow-lg transition-all duration-300 transform active:scale-95 ${
-                                        isInCart 
-                                            ? "bg-red-500 hover:bg-red-600 text-white" 
-                                            : "bg-zinc-900 hover:bg-zinc-800 text-white"
-                                    }`}
-                                >
-                                    <FaShoppingCart className="text-xl" />
-                                    {isInCart ? "Remove from Cart" : "Add to Cart"}
-                                </button>
-
-                                <button
-                                    onClick={() => navigate(`/checkout?product=${product.id}`)}
-                                    className="w-full flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl font-bold text-lg shadow-lg transition-all duration-300 transform active:scale-95"
-                                >
-                                    Buy Now
-                                </button>
+                            <div className="space-y-2">
+                                <FaShieldAlt className="mx-auto text-xl text-zinc-700" />
+                                <div className="font-medium text-zinc-700">Secure Pay</div>
                             </div>
-
-                            <div className="grid grid-cols-3 gap-4 p-6 bg-white rounded-2xl border border-zinc-200">
-                                <div className="text-center">
-                                    <div className="w-12 h-12 mx-auto mb-2 flex items-center justify-center rounded-full bg-blue-100">
-                                        <FaTruck className="text-blue-600 text-xl" />
-                                    </div>
-                                    <p className="text-xs font-semibold text-zinc-900">Free Delivery</p>
-                                    <p className="text-xs text-zinc-500">On orders $50+</p>
-                                </div>
-                                <div className="text-center">
-                                    <div className="w-12 h-12 mx-auto mb-2 flex items-center justify-center rounded-full bg-green-100">
-                                        <FaShieldAlt className="text-green-600 text-xl" />
-                                    </div>
-                                    <p className="text-xs font-semibold text-zinc-900">Secure Pay</p>
-                                    <p className="text-xs text-zinc-500">100% Protected</p>
-                                </div>
-                                <div className="text-center">
-                                    <div className="w-12 h-12 mx-auto mb-2 flex items-center justify-center rounded-full bg-purple-100">
-                                        <FaUndo className="text-purple-600 text-xl" />
-                                    </div>
-                                    <p className="text-xs font-semibold text-zinc-900">Easy Return</p>
-                                    <p className="text-xs text-zinc-500">30 Days</p>
-                                </div>
-                            </div>
-
-                            <div className="p-6 bg-zinc-100 rounded-2xl border border-zinc-200 space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-zinc-600 font-medium">SKU</span>
-                                    <span className="text-zinc-900 font-bold">{product.sku || "N/A"}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-zinc-600 font-medium">Availability</span>
-                                    <span className={`font-bold ${product.stock > 0 ? "text-green-600" : "text-red-600"}`}>
-                                        {product.stock > 0 ? `${product.stock} In Stock` : "Out of Stock"}
-                                    </span>
-                                </div>
+                            <div className="space-y-2">
+                                <FaUndo className="mx-auto text-xl text-zinc-700" />
+                                <div className="font-medium text-zinc-700">Easy Return</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-16 bg-white rounded-3xl shadow-sm border border-zinc-200 overflow-hidden">
-                    <div className="border-b border-zinc-200 bg-zinc-50">
-                        <nav className="flex">
-                            {["description", "additional", "reviews"].map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`flex-1 py-5 px-6 font-bold text-sm uppercase tracking-wider transition-all ${
-                                        activeTab === tab
-                                            ? "bg-white text-zinc-900 border-b-4 border-zinc-900"
-                                            : "text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100"
-                                    }`}
-                                >
-                                    {tab === "reviews" ? `Reviews (${reviews.length})` : tab}
-                                </button>
-                            ))}
-                        </nav>
+                <div className="mt-16 bg-white rounded-3xl border shadow-sm overflow-hidden">
+                    <div className="flex border-b">
+                        {["description", "additional", "reviews"].map(t => (
+                            <button
+                                key={t}
+                                onClick={() => setActiveTab(t)}
+                                className={`flex-1 py-4 font-bold uppercase text-sm transition ${
+                                    activeTab === t 
+                                        ? "border-b-4 border-zinc-900 text-zinc-900" 
+                                        : "text-zinc-500 hover:text-zinc-700"
+                                }`}
+                            >
+                                {t === "reviews" ? `Reviews (${reviews.length})` : t}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="p-8">
                         {activeTab === "description" && (
-                            <div className="space-y-4">
-                                {product.description ? (
-                                    product.description.split(/\n\n|\r\n\r\n/).map((paragraph, index) => (
-                                        <p key={index} className="text-zinc-700 leading-relaxed text-base">
-                                            {paragraph}
-                                        </p>
-                                    ))
-                                ) : (
-                                    <div className="text-center py-8 text-zinc-500">No description available.</div>
-                                )}
+                            <div className="text-zinc-700 whitespace-pre-line leading-relaxed">
+                                {product.description || "No description available."}
                             </div>
                         )}
 
                         {activeTab === "additional" && (
-                            <div className="space-y-3">
-                                {product.additional_info ? (
-                                    product.additional_info.split(/\r?\n/).filter((line) => line.trim() !== "").map((line, index) => {
-                                        const colonIndex = line.indexOf(':');
-                                        const hasColon = colonIndex !== -1;
-                                        const label = hasColon ? line.substring(0, colonIndex).trim() : '';
-                                        const value = hasColon ? line.substring(colonIndex + 1).trim() : line;
-                                        
-                                        return (
-                                            <div key={index} className="flex items-start gap-3 p-4 bg-zinc-50 rounded-xl">
-                                                <div className="w-2 h-2 rounded-full bg-zinc-900 mt-2"></div>
-                                                <span className="text-zinc-700">
-                                                    {hasColon ? (
-                                                        <>
-                                                            <span className="font-bold text-zinc-900">{label}:</span>{' '}
-                                                            <span className="font-normal">{value}</span>
-                                                        </>
-                                                    ) : (
-                                                        <span className="font-normal">{line}</span>
-                                                    )}
-                                                </span>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div className="text-center py-8 text-zinc-500">No additional information available.</div>
-                                )}
+                            <div className="text-zinc-700 whitespace-pre-line leading-relaxed">
+                                {product.additional_info || "No additional information available."}
                             </div>
                         )}
 
                         {activeTab === "reviews" && (
                             <div className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-8 text-center border border-amber-200">
-                                        <div className="text-7xl font-black text-zinc-900 mb-2">
-                                            {reviews && reviews.length
-                                                ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-                                                : product.rating
-                                                ? Number(product.rating).toFixed(1)
-                                                : "0.0"}
+                                
+                                {reviews.length > 0 && (
+                                    <div className="bg-zinc-50 rounded-2xl p-6 grid md:grid-cols-2 gap-8">
+                                        <div className="flex flex-col items-center justify-center border-r border-zinc-200">
+                                            <div className="text-6xl font-black text-zinc-900 mb-2">
+                                                {avgRating.toFixed(1)}
+                                            </div>
+                                            <div className="flex gap-1 mb-2">
+                                                {Array.from({ length: 5 }).map((_, i) => (
+                                                    <FaStar key={i} className={`${i < roundedRating ? "text-amber-400" : "text-zinc-300"} text-xl`} />
+                                                ))}
+                                            </div>
+                                            <div className="text-sm text-zinc-600">
+                                                Based on {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                                            </div>
                                         </div>
-                                        <div className="flex items-center justify-center gap-1 mb-2">
+                                        <div className="space-y-2">
+                                            {[5, 4, 3, 2, 1].map(star => {
+                                                const count = ratingBreakdown[star];
+                                                const percentage = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                                                return (
+                                                    <div key={star} className="flex items-center gap-3">
+                                                        <div className="flex items-center gap-1 w-12">
+                                                            <span className="text-sm font-medium">{star}</span>
+                                                            <FaStar className="text-amber-400 text-xs" />
+                                                        </div>
+                                                        <div className="flex-1 h-2 bg-zinc-200 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="h-full bg-amber-400 transition-all"
+                                                                style={{ width: `${percentage}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-sm text-zinc-600 w-12 text-right">{count}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                
+                                <div className="border rounded-2xl p-6 bg-zinc-50">
+                                    <h3 className="text-xl font-bold mb-4 text-zinc-900">Write a Review</h3>
+                                    
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-zinc-700 mb-2">Your Rating</label>
+                                        <div className="flex gap-2">
                                             {Array.from({ length: 5 }).map((_, i) => (
-                                                <FaStar key={i} className="text-amber-400 text-lg" />
+                                                <button 
+                                                    key={i} 
+                                                    type="button"
+                                                    onClick={() => setReviewRating(i + 1)}
+                                                    onMouseEnter={() => setHoverRating(i + 1)}
+                                                    onMouseLeave={() => setHoverRating(0)}
+                                                    className="text-4xl transition-transform hover:scale-110"
+                                                >
+                                                    <FaStar className={`${
+                                                        (hoverRating || reviewRating) >= i + 1 
+                                                            ? "text-amber-400" 
+                                                            : "text-zinc-300"
+                                                    }`} />
+                                                </button>
                                             ))}
                                         </div>
-                                        <div className="text-sm text-zinc-600 font-medium">Based on {reviews.length} reviews</div>
                                     </div>
 
-                                    <div className="md:col-span-2 space-y-3">
-                                        {Array.from({ length: 5 }).map((_, i) => {
-                                            const star = 5 - i;
-                                            const count = reviews ? reviews.filter((r) => Number(r.rating) === star).length : 0;
-                                            const pct = reviews && reviews.length ? Math.round((count / reviews.length) * 100) : 0;
-                                            return (
-                                                <div key={star} className="flex items-center gap-4">
-                                                    <div className="flex items-center gap-1 w-24">
-                                                        <span className="font-bold text-zinc-900">{star}</span>
-                                                        <FaStar className="text-amber-400 text-sm" />
-                                                    </div>
-                                                    <div className="flex-1 h-3 bg-zinc-200 rounded-full overflow-hidden">
-                                                        <div 
-                                                            style={{ width: `${pct}%` }} 
-                                                            className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
-                                                        ></div>
-                                                    </div>
-                                                    <span className="w-12 text-sm font-bold text-zinc-600">{count}</span>
-                                                </div>
-                                            );
-                                        })}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-zinc-700 mb-2">Your Name</label>
+                                        <input 
+                                            type="text"
+                                            value={reviewName} 
+                                            onChange={e => setReviewName(e.target.value)} 
+                                            placeholder="Enter your name (optional)" 
+                                            className="w-full p-3 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 transition"
+                                        />
                                     </div>
-                                </div>
 
-                                <div className="bg-zinc-50 rounded-2xl p-8 border border-zinc-200">
-                                    <h3 className="text-2xl font-bold mb-6">Share Your Experience</h3>
-                                    <div className="flex items-center gap-2 mb-6">
-                                        {Array.from({ length: 5 }).map((_, i) => {
-                                            const val = i + 1;
-                                            return (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => setReviewRating(val)}
-                                                    className={`text-4xl transition-all duration-200 ${
-                                                        reviewRating >= val ? "text-amber-400 scale-110" : "text-zinc-300 hover:text-amber-200"
-                                                    }`}
-                                                >
-                                                    ★
-                                                </button>
-                                            );
-                                        })}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-zinc-700 mb-2">Your Review</label>
+                                        <textarea 
+                                            value={reviewText} 
+                                            onChange={e => setReviewText(e.target.value)} 
+                                            placeholder="Share your experience with this product..." 
+                                            rows={4}
+                                            className="w-full p-3 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 transition resize-none"
+                                        />
                                     </div>
-                                    <input
-                                        value={reviewName}
-                                        onChange={(e) => setReviewName(e.target.value)}
-                                        placeholder="Your name"
-                                        className="w-full mb-4 p-4 border-2 border-zinc-300 rounded-xl focus:border-zinc-900 focus:ring-0 transition-colors font-medium"
-                                    />
-                                    <textarea
-                                        value={reviewText}
-                                        onChange={(e) => setReviewText(e.target.value)}
-                                        placeholder="Tell us what you think..."
-                                        className="w-full p-4 border-2 border-zinc-300 rounded-xl mb-4 focus:border-zinc-900 focus:ring-0 transition-colors font-medium"
-                                        rows={4}
-                                    />
-                                    <button
-                                        onClick={submitReview}
-                                        disabled={submittingReview}
-                                        className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+
+                                    <button 
+                                        type="button"
+                                        onClick={submitReview} 
+                                        disabled={submitting}
+                                        className="px-8 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition disabled:bg-zinc-400 disabled:cursor-not-allowed"
                                     >
-                                        {submittingReview ? "Submitting..." : "Post Review"}
+                                        {submitting ? "Submitting..." : "Submit Review"}
                                     </button>
                                 </div>
 
+                            
                                 <div className="space-y-4">
-                                    {loadingReviews ? (
-                                        <div className="text-center py-12 text-zinc-500">Loading reviews...</div>
-                                    ) : reviews && reviews.length ? (
-                                        reviews.map((r) => (
-                                            <div key={r.id} className="bg-white rounded-2xl p-6 border border-zinc-200 hover:shadow-md transition-shadow">
-                                                <div className="flex items-start justify-between mb-3">
-                                                    <div>
-                                                        <div className="font-bold text-zinc-900 mb-1">{r.name || "Anonymous"}</div>
-                                                        <div className="flex items-center gap-1">
-                                                            {Array.from({ length: r.rating }).map((_, i) => (
-                                                                <FaStar key={i} className="text-amber-400 text-sm" />
-                                                            ))}
-                                                        </div>
+                                    <h3 className="text-xl font-bold text-zinc-900">Customer Reviews</h3>
+                                    {reviews.length > 0 ? (
+                                        reviews.map(r => (
+                                            <div key={r.id} className="border rounded-2xl p-6 bg-white hover:shadow-md transition">
+                                                <div className="flex items-start gap-4">
+                                                    <div className="w-12 h-12 rounded-full bg-zinc-200 flex items-center justify-center flex-shrink-0">
+                                                        <FaUserCircle className="text-3xl text-zinc-500" />
                                                     </div>
-                                                    <span className="text-sm text-zinc-500">{new Date(r.created_at).toLocaleDateString()}</span>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div>
+                                                                <div className="font-bold text-zinc-900">{r.name}</div>
+                                                                <div className="text-xs text-zinc-500">{formatDate(r.created_at)}</div>
+                                                            </div>
+                                                            <div className="flex gap-1">
+                                                                {Array.from({ length: 5 }).map((_, i) => (
+                                                                    <FaStar 
+                                                                        key={i} 
+                                                                        className={`${i < r.rating ? "text-amber-400" : "text-zinc-300"} text-sm`} 
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-zinc-700 leading-relaxed">{r.comment}</p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-zinc-700 leading-relaxed">{r.comment}</p>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="text-center py-12 text-zinc-500">
-                                            No reviews yet. Be the first to share your thoughts!
+                                        <div className="text-center py-12 text-zinc-500 bg-zinc-50 rounded-2xl">
+                                            <FaStar className="mx-auto text-4xl text-zinc-300 mb-3" />
+                                            <div className="font-medium">No reviews yet</div>
+                                            <div className="text-sm">Be the first to review this product!</div>
                                         </div>
                                     )}
                                 </div>
@@ -555,36 +540,6 @@ export default function ProductDetails() {
                     </div>
                 </div>
 
-                {related && related.length > 0 && (
-                    <div className="mt-16">
-                        <h2 className="text-3xl font-bold text-zinc-900 mb-8">You Might Also Like</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                            {related.map((p) => {
-                                const rImages = Array.isArray(p.images) ? p.images : (() => { try { return JSON.parse(p.images || "[]"); } catch { return []; } })();
-                                const thumb = (rImages && rImages[0]) || p.image_url || "";
-                                return (
-                                    <div
-                                        key={p.id}
-                                        className="group bg-white rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-2 border border-zinc-200"
-                                        onClick={() => navigate(`/product/${p.slug || p.id}`)}
-                                    >
-                                        <div className="aspect-square bg-zinc-50 flex items-center justify-center p-6 overflow-hidden">
-                                            {thumb ? (
-                                                <img src={thumb} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110" alt={p.name} />
-                                            ) : (
-                                                <div className="text-zinc-400">No image</div>
-                                            )}
-                                        </div>
-                                        <div className="p-5">
-                                            <h3 className="text-sm font-bold text-zinc-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">{p.name}</h3>
-                                            <p className="text-xl font-black text-zinc-900">${(Number(p.price) || 0).toFixed(2)}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
